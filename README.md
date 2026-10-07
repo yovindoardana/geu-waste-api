@@ -2,6 +2,8 @@
 
 Production-ready backend API service for the **GEU Waste Management System**, built with Go (Golang) and PostgreSQL. The system manages household waste registration, multi-stage pickup lifecycles, automated tariff calculation and invoice generation, payment proof upload verification, and aggregation reporting.
 
+> 🌐 **Language Options**: [English (README.md)](README.md) | [Bahasa Indonesia (README.id.md)](README.id.md)
+
 ---
 
 ## 🏗️ Architecture & Technical Stack
@@ -36,7 +38,8 @@ geu-waste-api/
 ├── Dockerfile        # Production multi-stage container build
 ├── docker-compose.yml# Multi-container local stack (PostgreSQL + API)
 ├── Makefile          # Developer tooling and automation tasks
-└── README.md
+├── README.md         # English Documentation
+└── README.id.md      # Indonesian Documentation
 ```
 
 ---
@@ -45,11 +48,11 @@ geu-waste-api/
 
 | ID | Rule Name | Description |
 |---|---|---|
-| **BR01** | **Pending Payment Block** | A household with any pending unpaid payment for a completed pickup cannot create a new pickup (`POST /api/pickups`). Returns `409 Conflict` (`HOUSEHOLD_PENDING_PAYMENT`). |
+| **BR01** | **Pending Payment Block** | A household with any pending unpaid payment for a completed pickup cannot create a new pickup (`POST /api/pickups`). Returns `409 Conflict` (`HOUSEHOLD_PENDING_PAYMENT`). Protected by strict hierarchical lock ordering (`households` $\rightarrow$ `waste_pickups`). |
 | **BR02** | **Pending State for Scheduling** | Only pickups with status `pending` can be scheduled (`PUT /api/pickups/:id/schedule`). Other states return `409 Conflict` (`INVALID_STATE_TRANSITION`). |
 | **BR03** | **Electronic Safety Check** | Electronic waste pickups (`type: electronic`) can only be scheduled if effective `safety_check` is `true`. (Creating an electronic pickup allows `safety_check: false`; scheduling requires `safety_check: true`). Returns `409 Conflict` (`SAFETY_CHECK_REQUIRED`) if false. |
 | **BR04** | **Atomic Completion & Invoicing** | Completing a pickup (`PUT /api/pickups/:id/complete`) atomically marks the pickup as `completed` and creates a pending payment invoice in a single database transaction. Standard waste (`organic`, `plastic`, `paper`) = **Rp 50,000.00**; Electronic waste (`electronic`) = **Rp 100,000.00**. |
-| **BR05** | **Proof Upload for Confirmation** | Confirming a payment (`PUT /api/payments/:id/confirm`) strictly requires a valid local proof image (JPEG/PNG, $\le 5\text{MB}$, $\le 10,000\text{px}$). |
+| **BR05** | **Proof Upload for Confirmation** | Confirming a payment (`PUT /api/payments/:id/confirm`) strictly requires a valid local proof image (JPEG/PNG, $\le 5\text{MB}$, $\le 10,000\text{px}$). Promoted from staging to final path before DB update, and preserved upon `ErrCommitUncertain`. |
 | **D01** | **Idempotent Invoice Endpoint** | `POST /api/payments` ensures an invoice exists for a completed pickup (returns `201 Created` if newly generated, or `200 OK` if already exists). |
 | **D08** | **Revenue Aggregation** | Payment summary report calculates `total_revenue` by strictly summing amounts from payments with `status = 'paid'`. |
 
@@ -69,13 +72,13 @@ cp .env.example .env
 | `SERVER_HOST` | `0.0.0.0` | Host IP address binding |
 | `DB_HOST` | `localhost` | PostgreSQL host (`postgres` in Docker Compose) |
 | `DB_PORT` | `5432` | PostgreSQL port |
-| `DB_USER` | `geu_user` | PostgreSQL database username |
-| `DB_PASSWORD` | `geu_password` | PostgreSQL database password |
-| `DB_NAME` | `geu_waste_db` | PostgreSQL database name |
+| `DB_USER` | `postgres` | PostgreSQL database username |
+| `DB_PASSWORD` | `postgres` | PostgreSQL database password |
+| `DB_NAME` | `geu_waste` | PostgreSQL application database name |
+| `TEST_DB_NAME` | `geu_waste_test` | Dedicated isolated database for integration test suite |
 | `DB_SSLMODE` | `disable` | PostgreSQL SSL connection mode (`disable`, `require`) |
 | `UPLOAD_DIR` | `./uploads/payment-proofs` | Directory where uploaded payment proofs are stored |
 | `MAX_UPLOAD_SIZE_MB` | `5` | Maximum upload file size in megabytes |
-| `ALLOWED_FILE_TYPES` | `image/jpeg,image/png` | Comma-separated allowed MIME content types |
 
 ---
 
@@ -85,13 +88,13 @@ To start both the PostgreSQL database and the API service in containers:
 
 ```bash
 # Build and run container stack
-docker-compose up -d --build
+docker compose up -d --build
 
 # View container logs
-docker-compose logs -f app
+docker compose logs -f app
 
 # Stop containers
-docker-compose down
+docker compose down
 ```
 
 The API will be accessible at `http://localhost:8080`.
