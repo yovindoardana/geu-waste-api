@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -160,48 +161,35 @@ func (s *PaymentService) ConfirmPaymentWithProof(
 	}
 
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		dstFile.Close()
-		os.Remove(stagingPath)
+		_ = dstFile.Close()
+		_ = os.Remove(stagingPath)
 		return nil, fmt.Errorf("failed to save staging file: %w", err)
 	}
-	dstFile.Close()
+	if err := dstFile.Close(); err != nil {
+		_ = os.Remove(stagingPath)
+		return nil, fmt.Errorf("failed to close staging file: %w", err)
+	}
 
-	// 5. Atomic DB confirmation
+	// 5. Promote staging file to final filename BEFORE database mutation
+	if err := os.Rename(stagingPath, finalPath); err != nil {
+		_ = os.Remove(stagingPath)
+		return nil, fmt.Errorf("failed to promote staging file to final: %w", err)
+	}
+
+	// 6. Atomic DB confirmation
 	proofURL := "/uploads/payment-proofs/" + serverFilename
 	now := time.Now().UTC()
 
 	confirmed, err := s.repo.ConfirmPayment(ctx, paymentID, proofURL, now)
 	if err != nil {
-		// Clean up staging file on failure
-		os.Remove(stagingPath)
+		// Clean up final file on definitive failure before commit.
+		// If commit outcome is uncertain, preserve final file for reconciliation (D17).
+		if !errors.Is(err, domain.ErrCommitUncertain) {
+			_ = os.Remove(finalPath)
+		}
 		return nil, err
 	}
 
-	// 6. Promote staging file to final filename
-	if err := os.Rename(stagingPath, finalPath); err != nil {
-		// If rename fails, try copy then remove
-		if copyErr := copyFile(stagingPath, finalPath); copyErr == nil {
-			os.Remove(stagingPath)
-		}
-	}
-
 	return confirmed, nil
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	return err
 }
 

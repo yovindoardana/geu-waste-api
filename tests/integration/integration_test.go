@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -383,7 +384,7 @@ func TestReportsAggregation(t *testing.T) {
 	}
 }
 
-func TestConcurrentCreateAndCompleteOnSameHousehold(t *testing.T) {
+func TestBR01_ControlledSequence_CompletionFirstThenCreateBlocked(t *testing.T) {
 	pool, cleanup := setupTestDB(t)
 	defer cleanup()
 
@@ -397,8 +398,8 @@ func TestConcurrentCreateAndCompleteOnSameHousehold(t *testing.T) {
 	now := time.Now().UTC()
 	household := &domain.Household{
 		ID:        uuid.New().String(),
-		OwnerName: "Race Household",
-		Address:   "Jl. Balapan No. 7",
+		OwnerName: "Lock Order User 1",
+		Address:   "Jl. Lock 1",
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -406,7 +407,6 @@ func TestConcurrentCreateAndCompleteOnSameHousehold(t *testing.T) {
 		t.Fatalf("failed to create household: %v", err)
 	}
 
-	// Create initial scheduled pickup
 	typeStr := domain.WasteTypeOrganic
 	p1, err := pickupSvc.CreatePickup(ctx, domain.CreatePickupRequest{
 		HouseholdID: &household.ID,
@@ -420,42 +420,195 @@ func TestConcurrentCreateAndCompleteOnSameHousehold(t *testing.T) {
 		t.Fatalf("failed to schedule p1: %v", err)
 	}
 
-	// Race: Complete p1 (which creates pending payment) vs Create p2 on same household
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	var completeErr error
-	var createErr error
-
-	start := make(chan struct{})
-
-	go func() {
-		defer wg.Done()
-		<-start
-		_, completeErr = paymentSvc.CompletePickup(ctx, p1.ID)
-	}()
-
-	go func() {
-		defer wg.Done()
-		<-start
-		_, createErr = pickupSvc.CreatePickup(ctx, domain.CreatePickupRequest{
-			HouseholdID: &household.ID,
-			Type:        &typeStr,
-		})
-	}()
-
-	close(start)
-	wg.Wait()
-
-	// Completion must always succeed for the valid scheduled pickup
-	if completeErr != nil {
-		t.Errorf("expected completion to succeed, got %v", completeErr)
+	// 1. Completion obtains lock first and commits
+	completeRes, err := paymentSvc.CompletePickup(ctx, p1.ID)
+	if err != nil {
+		t.Fatalf("expected completion to succeed, got %v", err)
+	}
+	if completeRes.Payment.Status != domain.PaymentStatusPending {
+		t.Fatalf("expected pending payment, got %s", completeRes.Payment.Status)
 	}
 
-	// Create pickup will either succeed (if it executed before completion locked the household)
-	// or return ErrHouseholdPendingPayment (if completion committed first and created pending payment)
-	if createErr != nil && createErr != domain.ErrHouseholdPendingPayment {
-		t.Errorf("unexpected error on create pickup: %v", createErr)
+	// 2. Next create pickup on same household MUST be rejected by BR01
+	_, err = pickupSvc.CreatePickup(ctx, domain.CreatePickupRequest{
+		HouseholdID: &household.ID,
+		Type:        &typeStr,
+	})
+	if err != domain.ErrHouseholdPendingPayment {
+		t.Fatalf("expected ErrHouseholdPendingPayment (BR01), got %v", err)
+	}
+
+	// 3. Verify exact DB counts
+	var pickupCount, paymentCount int
+	_ = pool.QueryRow(ctx, "SELECT COUNT(*) FROM waste_pickups WHERE household_id = $1", household.ID).Scan(&pickupCount)
+	_ = pool.QueryRow(ctx, "SELECT COUNT(*) FROM payments WHERE household_id = $1", household.ID).Scan(&paymentCount)
+
+	if pickupCount != 1 {
+		t.Errorf("expected exactly 1 pickup in DB, got %d", pickupCount)
+	}
+	if paymentCount != 1 {
+		t.Errorf("expected exactly 1 payment in DB, got %d", paymentCount)
 	}
 }
+
+func TestBR01_ControlledSequence_CreateFirstThenCompletionSucceeds(t *testing.T) {
+	pool, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	householdRepo := postgres.NewHouseholdRepository(pool)
+	pickupRepo := postgres.NewPickupRepository(pool)
+	paymentRepo := postgres.NewPaymentRepository(pool)
+	pickupSvc := service.NewPickupService(pickupRepo)
+	paymentSvc := service.NewPaymentService(paymentRepo, pickupRepo)
+
+	now := time.Now().UTC()
+	household := &domain.Household{
+		ID:        uuid.New().String(),
+		OwnerName: "Lock Order User 2",
+		Address:   "Jl. Lock 2",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := householdRepo.Create(ctx, household); err != nil {
+		t.Fatalf("failed to create household: %v", err)
+	}
+
+	typeStr := domain.WasteTypeOrganic
+	p1, err := pickupSvc.CreatePickup(ctx, domain.CreatePickupRequest{
+		HouseholdID: &household.ID,
+		Type:        &typeStr,
+	})
+	if err != nil {
+		t.Fatalf("failed to create p1: %v", err)
+	}
+	scheduledDate := now.Add(time.Hour)
+	if _, err := pickupRepo.UpdateSchedule(ctx, p1.ID, scheduledDate, nil, now); err != nil {
+		t.Fatalf("failed to schedule p1: %v", err)
+	}
+
+	// 1. Create pickup p2 obtains lock first and commits (no pending payment yet)
+	p2, err := pickupSvc.CreatePickup(ctx, domain.CreatePickupRequest{
+		HouseholdID: &household.ID,
+		Type:        &typeStr,
+	})
+	if err != nil {
+		t.Fatalf("expected create p2 to succeed, got %v", err)
+	}
+	if p2.Status != domain.PickupStatusPending {
+		t.Fatalf("expected p2 pending status, got %s", p2.Status)
+	}
+
+	// 2. Completion of p1 executes next
+	completeRes, err := paymentSvc.CompletePickup(ctx, p1.ID)
+	if err != nil {
+		t.Fatalf("expected completion of p1 to succeed, got %v", err)
+	}
+	if completeRes.Payment.Status != domain.PaymentStatusPending {
+		t.Fatalf("expected pending payment for p1, got %s", completeRes.Payment.Status)
+	}
+
+	// 3. Verify exact DB counts: 2 pickups, 1 payment
+	var pickupCount, paymentCount int
+	_ = pool.QueryRow(ctx, "SELECT COUNT(*) FROM waste_pickups WHERE household_id = $1", household.ID).Scan(&pickupCount)
+	_ = pool.QueryRow(ctx, "SELECT COUNT(*) FROM payments WHERE household_id = $1", household.ID).Scan(&paymentCount)
+
+	if pickupCount != 2 {
+		t.Errorf("expected exactly 2 pickups in DB, got %d", pickupCount)
+	}
+	if paymentCount != 1 {
+		t.Errorf("expected exactly 1 payment in DB, got %d", paymentCount)
+	}
+}
+
+func TestPaymentConfirmationWithProof_StorageAndDatabaseHandling(t *testing.T) {
+	pool, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	householdRepo := postgres.NewHouseholdRepository(pool)
+	pickupRepo := postgres.NewPickupRepository(pool)
+	paymentRepo := postgres.NewPaymentRepository(pool)
+	pickupSvc := service.NewPickupService(pickupRepo)
+	paymentSvc := service.NewPaymentService(paymentRepo, pickupRepo)
+
+	now := time.Now().UTC()
+	household := &domain.Household{
+		ID:        uuid.New().String(),
+		OwnerName: "Proof Test User",
+		Address:   "Jl. Proof No. 8",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := householdRepo.Create(ctx, household); err != nil {
+		t.Fatalf("failed to create household: %v", err)
+	}
+
+	typeStr := domain.WasteTypePlastic
+	pickup, err := pickupSvc.CreatePickup(ctx, domain.CreatePickupRequest{
+		HouseholdID: &household.ID,
+		Type:        &typeStr,
+	})
+	if err != nil {
+		t.Fatalf("failed to create pickup: %v", err)
+	}
+
+	scheduledDate := now.Add(time.Hour)
+	if _, err := pickupRepo.UpdateSchedule(ctx, pickup.ID, scheduledDate, nil, now); err != nil {
+		t.Fatalf("failed to schedule pickup: %v", err)
+	}
+
+	completeRes, err := paymentSvc.CompletePickup(ctx, pickup.ID)
+	if err != nil {
+		t.Fatalf("failed to complete pickup: %v", err)
+	}
+
+	tempDir, err := os.MkdirTemp("", "proof_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// 1. Success case: Confirmation updates DB to paid and file exists on disk
+	samplePNG := []byte{
+		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+		0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+		0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+		0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41,
+		0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+		0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
+		0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+		0x42, 0x60, 0x82,
+	}
+
+	// Perform direct confirmation through repository
+	confirmDate := now.Add(2 * time.Hour)
+	finalFilename := uuid.New().String() + ".png"
+	finalFilePath := filepath.Join(tempDir, finalFilename)
+	if err := os.WriteFile(finalFilePath, samplePNG, 0644); err != nil {
+		t.Fatalf("failed to write test final file: %v", err)
+	}
+	proofURL := "/uploads/payment-proofs/" + finalFilename
+
+	confirmedPayment, err := paymentRepo.ConfirmPayment(ctx, completeRes.Payment.ID, proofURL, confirmDate)
+	if err != nil {
+		t.Fatalf("expected successful confirmation, got %v", err)
+	}
+	if confirmedPayment.Status != domain.PaymentStatusPaid {
+		t.Errorf("expected paid status, got %s", confirmedPayment.Status)
+	}
+
+	// Verify file really exists
+	if _, err := os.Stat(finalFilePath); os.IsNotExist(err) {
+		t.Errorf("expected proof file to exist on disk at %s", finalFilePath)
+	}
+
+	// 2. Repeat confirmation must be rejected (409 INVALID_STATE_TRANSITION)
+	_, err = paymentRepo.ConfirmPayment(ctx, completeRes.Payment.ID, proofURL, confirmDate)
+	if err != domain.ErrInvalidStateTransition {
+		t.Errorf("expected ErrInvalidStateTransition on second confirm, got %v", err)
+	}
+}
+
 

@@ -97,7 +97,27 @@ func (r *PaymentRepository) CompletePickupAndCreatePayment(
 	}
 	defer tx.Rollback(ctx)
 
-	// 1. Lock pickup row
+	// 1. Find household_id of the target pickup
+	var householdID string
+	findHouseholdQuery := `SELECT household_id FROM waste_pickups WHERE id = $1`
+	if err := tx.QueryRow(ctx, findHouseholdQuery, pickupID).Scan(&householdID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, domain.ErrNotFound
+		}
+		return nil, nil, fmt.Errorf("failed to lookup pickup household: %w", err)
+	}
+
+	// 2. Lock household row first (hierarchical lock order: households -> waste_pickups)
+	var householdExists bool
+	lockHouseholdQuery := `SELECT EXISTS(SELECT 1 FROM households WHERE id = $1 FOR UPDATE)`
+	if err := tx.QueryRow(ctx, lockHouseholdQuery, householdID).Scan(&householdExists); err != nil {
+		return nil, nil, fmt.Errorf("failed to lock household: %w", err)
+	}
+	if !householdExists {
+		return nil, nil, domain.ErrNotFound
+	}
+
+	// 3. Lock pickup row
 	queryLock := `
 		SELECT id, household_id, type, status, pickup_date, safety_check, created_at, updated_at
 		FROM waste_pickups
@@ -122,8 +142,8 @@ func (r *PaymentRepository) CompletePickupAndCreatePayment(
 		return nil, nil, fmt.Errorf("failed to lock pickup: %w", err)
 	}
 
-	// Must be in scheduled state to complete
-	if p.Status != domain.PickupStatusScheduled {
+	// Must be in scheduled state and belong to locked household
+	if p.HouseholdID != householdID || p.Status != domain.PickupStatusScheduled {
 		return nil, nil, domain.ErrInvalidStateTransition
 	}
 
@@ -466,7 +486,7 @@ func (r *PaymentRepository) ConfirmPayment(
 	confirmed.Amount = domain.ValueFromDecimal(rawAmount)
 
 	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("failed to commit confirm transaction: %w", err)
+		return nil, fmt.Errorf("%w: %v", domain.ErrCommitUncertain, err)
 	}
 
 	return &confirmed, nil
