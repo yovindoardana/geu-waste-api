@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/yovindoardana/geu-waste-api/internal/response"
@@ -23,9 +24,17 @@ func RecoveryMiddleware() gin.HandlerFunc {
 	}
 }
 
-// BodyLimitMiddleware restricts request body size to maxBytes.
-func BodyLimitMiddleware(maxBytes int64) gin.HandlerFunc {
+// BodyLimitMiddleware restricts request body size:
+// - multipart/form-data: max multipartMaxBytes (6 MiB)
+// - json / default: max jsonMaxBytes (1 MiB)
+func BodyLimitMiddleware(jsonMaxBytes, multipartMaxBytes int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		maxBytes := jsonMaxBytes
+		contentType := c.GetHeader("Content-Type")
+		if strings.HasPrefix(strings.ToLower(contentType), "multipart/form-data") {
+			maxBytes = multipartMaxBytes
+		}
+
 		if c.Request.ContentLength > maxBytes {
 			response.Error(c, http.StatusRequestEntityTooLarge, response.CodePayloadTooLarge, "payload too large", nil)
 			c.Abort()

@@ -76,7 +76,7 @@ func setupRouter(dbPool *pgxpool.Pool, uploadDir string) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger())
 	router.Use(handler.RecoveryMiddleware())
-	router.Use(handler.BodyLimitMiddleware(1 << 20)) // 1 MiB body limit for JSON
+	router.Use(handler.BodyLimitMiddleware(1<<20, 6<<20)) // 1 MiB for JSON, 6 MiB for multipart upload
 
 	router.HandleMethodNotAllowed = true
 	router.NoRoute(handler.NoRouteHandler())

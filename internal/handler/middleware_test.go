@@ -44,12 +44,12 @@ func TestRecoveryMiddleware(t *testing.T) {
 
 func TestBodyLimitMiddleware(t *testing.T) {
 	router := gin.New()
-	router.Use(BodyLimitMiddleware(100)) // 100 bytes limit
+	router.Use(BodyLimitMiddleware(100, 500)) // 100 bytes JSON limit, 500 bytes multipart limit
 	router.POST("/upload", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	// Case 1: Body larger than limit
+	// Case 1: JSON body larger than 100 bytes limit
 	largePayload := strings.Repeat("A", 200)
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/upload", strings.NewReader(largePayload))
@@ -57,7 +57,17 @@ func TestBodyLimitMiddleware(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusRequestEntityTooLarge {
-		t.Errorf("expected status 413, got %d", w.Code)
+		t.Errorf("expected status 413 for large JSON, got %d", w.Code)
+	}
+
+	// Case 2: Multipart body larger than 100 bytes but under 500 bytes allowed
+	w2 := httptest.NewRecorder()
+	req2, _ := http.NewRequest("POST", "/upload", strings.NewReader(largePayload))
+	req2.Header.Set("Content-Type", "multipart/form-data; boundary=something")
+	router.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusOK {
+		t.Errorf("expected status 200 for multipart under 500 bytes, got %d", w2.Code)
 	}
 }
 

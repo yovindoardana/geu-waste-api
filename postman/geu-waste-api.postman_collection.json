@@ -10,7 +10,7 @@
       "name": "Health Check",
       "item": [
         {
-          "name": "Healthz",
+          "name": "Health",
           "event": [
             {
               "listen": "test",
@@ -21,8 +21,8 @@
                   "});",
                   "pm.test(\"Response status is healthy\", function () {",
                   "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData.status).to.eql(\"healthy\");",
-                  "    pm.expect(jsonData.service).to.eql(\"geu-waste-api\");",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.message).to.eql(\"service is healthy\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -33,9 +33,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/healthz",
+              "raw": "{{base_url}}/health",
               "host": ["{{base_url}}"],
-              "path": ["healthz"]
+              "path": ["health"]
             }
           },
           "response": []
@@ -173,7 +173,7 @@
                   "    var jsonData = pm.response.json();",
                   "    pm.expect(jsonData.success).to.be.true;",
                   "    pm.expect(jsonData.data.status).to.eql(\"pending\");",
-                  "    pm.expect(jsonData.data.waste_type).to.eql(\"organic\");",
+                  "    pm.expect(jsonData.data.type).to.eql(\"organic\");",
                   "    pm.environment.set(\"pickup_id\", jsonData.data.id);",
                   "});"
                 ],
@@ -191,7 +191,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"household_id\": \"{{household_id}}\",\n  \"waste_type\": \"organic\",\n  \"notes\": \"Organic kitchen waste in green bag\"\n}"
+              "raw": "{\n  \"household_id\": \"{{household_id}}\",\n  \"type\": \"organic\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/pickups",
@@ -225,12 +225,12 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/pickups?status=pending&waste_type=organic&limit=10",
+              "raw": "{{base_url}}/api/pickups?status=pending&household_id={{household_id}}&limit=10",
               "host": ["{{base_url}}"],
               "path": ["api", "pickups"],
               "query": [
                 { "key": "status", "value": "pending" },
-                { "key": "waste_type", "value": "organic" },
+                { "key": "household_id", "value": "{{household_id}}" },
                 { "key": "limit", "value": "10" }
               ]
             }
@@ -251,7 +251,7 @@
                   "    var jsonData = pm.response.json();",
                   "    pm.expect(jsonData.success).to.be.true;",
                   "    pm.expect(jsonData.data.status).to.eql(\"scheduled\");",
-                  "    pm.expect(jsonData.data.scheduled_date).to.not.be.null;",
+                  "    pm.expect(jsonData.data.pickup_date).to.not.be.null;",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -268,7 +268,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"scheduled_date\": \"2026-10-15T09:00:00Z\"\n}"
+              "raw": "{\n  \"pickup_date\": \"2026-10-15T09:00:00+07:00\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/pickups/{{pickup_id}}/schedule",
@@ -294,6 +294,7 @@
                   "    pm.expect(jsonData.data.pickup.status).to.eql(\"completed\");",
                   "    pm.expect(jsonData.data.payment.amount).to.eql(\"50000.00\");",
                   "    pm.expect(jsonData.data.payment.status).to.eql(\"pending\");",
+                  "    pm.expect(jsonData.data.payment.waste_id).to.eql(jsonData.data.pickup.id);",
                   "    pm.environment.set(\"payment_id\", jsonData.data.payment.id);",
                   "});"
                 ],
@@ -304,6 +305,10 @@
           "request": {
             "method": "PUT",
             "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
             "url": {
               "raw": "{{base_url}}/api/pickups/{{pickup_id}}/complete",
               "host": ["{{base_url}}"],
@@ -318,7 +323,7 @@
       "name": "3. Payments & Proofs",
       "item": [
         {
-          "name": "Ensure Payment (Idempotent)",
+          "name": "Ensure Payment (Idempotent 200/201)",
           "event": [
             {
               "listen": "test",
@@ -327,11 +332,11 @@
                   "pm.test(\"Status code is 200 or 201\", function () {",
                   "    pm.expect([200, 201]).to.include(pm.response.code);",
                   "});",
-                  "pm.test(\"Payment returned with amount string\", function () {",
+                  "pm.test(\"Payment returned with amount string 50000.00\", function () {",
                   "    var jsonData = pm.response.json();",
                   "    pm.expect(jsonData.success).to.be.true;",
-                  "    pm.expect(jsonData.data).to.have.property(\"amount\");",
-                  "    pm.expect(jsonData.data.status).to.eql(\"pending\");",
+                  "    pm.expect(jsonData.data.amount).to.eql(\"50000.00\");",
+                  "    pm.expect(jsonData.data.waste_id).to.eql(pm.environment.get(\"pickup_id\"));",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -348,7 +353,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"pickup_id\": \"{{pickup_id}}\"\n}"
+              "raw": "{\n  \"household_id\": \"{{household_id}}\",\n  \"waste_id\": \"{{pickup_id}}\",\n  \"amount\": \"50000.00\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/payments",
@@ -403,12 +408,12 @@
                   "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
-                  "pm.test(\"Payment confirmed with status paid and proof_url\", function () {",
+                  "pm.test(\"Payment confirmed with status paid and proof_file_url\", function () {",
                   "    var jsonData = pm.response.json();",
                   "    pm.expect(jsonData.success).to.be.true;",
                   "    pm.expect(jsonData.data.status).to.eql(\"paid\");",
-                  "    pm.expect(jsonData.data.proof_url).to.not.be.null;",
-                  "    var parts = jsonData.data.proof_url.split('/');",
+                  "    pm.expect(jsonData.data.proof_file_url).to.not.be.null;",
+                  "    var parts = jsonData.data.proof_file_url.split('/');",
                   "    var filename = parts[parts.length - 1];",
                   "    pm.environment.set(\"proof_filename\", filename);",
                   "});"
@@ -487,7 +492,7 @@
                   "    pm.expect(jsonData.success).to.be.true;",
                   "    pm.expect(jsonData.data.items).to.be.an(\"array\").with.lengthOf(16);",
                   "    pm.expect(jsonData.data.total_pickups).to.be.a(\"number\");",
-                  "    pm.expect(jsonData.data.items[0].waste_type).to.eql(\"organic\");",
+                  "    pm.expect(jsonData.data.items[0].type).to.eql(\"organic\");",
                   "    pm.expect(jsonData.data.items[0].status).to.eql(\"pending\");",
                   "});"
                 ],
@@ -545,20 +550,21 @@
       "name": "5. Business Rules & Error Validation",
       "item": [
         {
-          "name": "BR02: Reject E-Waste Without Safety Confirmation",
+          "name": "Create Electronic Pickup (Safety False Allowed)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status code is 422\", function () {",
-                  "    pm.response.to.have.status(422);",
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
                   "});",
-                  "pm.test(\"Returns BUSINESS_RULE_VIOLATION\", function () {",
+                  "pm.test(\"Created electronic pickup with safety_check false\", function () {",
                   "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData.success).to.be.false;",
-                  "    pm.expect(jsonData.code).to.eql(\"BUSINESS_RULE_VIOLATION\");",
-                  "    pm.expect(jsonData.message).to.include(\"electronic\");",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.type).to.eql(\"electronic\");",
+                  "    pm.expect(jsonData.data.safety_check).to.be.false;",
+                  "    pm.expect(jsonData.data.status).to.eql(\"pending\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -575,12 +581,52 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"household_id\": \"{{household_id}}\",\n  \"waste_type\": \"electronic\",\n  \"notes\": \"Old CRT television\",\n  \"e_waste_safety_confirmed\": false\n}"
+              "raw": "{\n  \"household_id\": \"{{household_id}}\",\n  \"type\": \"electronic\",\n  \"safety_check\": false\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/pickups",
               "host": ["{{base_url}}"],
               "path": ["api", "pickups"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "BR03: Reject Schedule Electronic with safety_check false",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 409\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test(\"Returns SAFETY_CHECK_REQUIRED\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.code).to.eql(\"SAFETY_CHECK_REQUIRED\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickup_date\": \"2026-10-15T09:00:00+07:00\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pickups/20000000-0000-4000-8000-000000000003/schedule",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pickups", "20000000-0000-4000-8000-000000000003", "schedule"]
             }
           },
           "response": []

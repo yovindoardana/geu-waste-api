@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM golang:1.24-alpine AS builder
+FROM golang:alpine AS builder
 
 WORKDIR /src
 
@@ -27,6 +27,7 @@ COPY --from=builder /bin/api /app/api
 COPY --from=builder /bin/migrate /app/migrate
 COPY --from=builder /bin/seed /app/seed
 COPY migrations/ /app/migrations/
+COPY seeds/ /app/seeds/
 
 EXPOSE 8080
 

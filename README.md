@@ -8,11 +8,11 @@ Production-ready backend API service for the **GEU Waste Management System**, bu
 
 The service adheres to Clean 3-Layer Architecture principles with strict separation of concerns:
 
-- **Transport / Handlers (`internal/handler/`)**: Gin HTTP routing, strict JSON validation (`DisallowUnknownFields`, 1 MiB body limits), multipart file parsing, and standardized JSON envelopes (`response.SuccessResponse`, `response.ListSuccessResponse`, `response.ErrorResponse`).
-- **Domain & Services (`internal/domain/`, `internal/service/`)**: Pure business logic, state machine validation, business rule enforcement (BR01, BR02, BR03), and transactional workflows.
+- **Transport / Handlers (`internal/handler/`)**: Gin HTTP routing, strict JSON validation (`DisallowUnknownFields`, 1 MiB body limit for JSON, 6 MiB for multipart file uploads), multipart file parsing, and standardized JSON envelopes (`response.SuccessResponse`, `response.ListSuccessResponse`, `response.ErrorResponse`).
+- **Domain & Services (`internal/domain/`, `internal/service/`)**: Pure business logic, state machine validation, business rule enforcement (BR01–BR05), and transactional workflows.
 - **Persistence / Repositories (`internal/repository/postgres/`)**: High-performance PostgreSQL operations using `jackc/pgx/v5` connection pools (`pgxpool`), parameterized queries, transactional execution with `SELECT ... FOR UPDATE` row locking.
 - **Monetary Arithmetic**: Exact fixed-point arithmetic using `github.com/shopspring/decimal`. Monetary values are stored as `NUMERIC(12,2)` in PostgreSQL and serialized as two-decimal JSON strings (e.g. `"50000.00"`, `"100000.00"`).
-- **Runtime & Deployment**: Multi-stage `Dockerfile` producing a minimal, secure scratch/distroless runner container, orchestrated with `docker-compose.yml` and graceful shutdown (`SIGTERM`/`SIGINT`).
+- **Runtime & Deployment**: Multi-stage `Dockerfile` producing a minimal, secure runner container, orchestrated with `docker-compose.yml` and graceful shutdown (`SIGTERM`/`SIGINT`).
 
 ```
 geu-waste-api/
@@ -45,11 +45,12 @@ geu-waste-api/
 
 | ID | Rule Name | Description |
 |---|---|---|
-| **BR01** | **Pending Payment Lock** | A household cannot request a new pickup (`POST /api/pickups`) if they have any pending unpaid payment for a previously completed pickup. |
-| **BR02** | **E-Waste Safety Confirmation** | Pickups with waste type `electronic` strictly require explicit safety confirmation (`"e_waste_safety_confirmed": true`). Returns `422 Unprocessable Entity` if omitted or false. |
-| **BR03** | **Pickup State Machine** | Strict state transition workflow: `pending` $\rightarrow$ `scheduled` $\rightarrow$ `completed` or `canceled`. Canceled pickups cannot be scheduled or completed. Completed pickups cannot be modified. |
-| **Tariffs** | **Waste Categorization** | Standard waste (`organic`, `plastic`, `paper`) is billed at **Rp 50,000.00**. Electronic waste (`electronic`) is billed at **Rp 100,000.00**. |
-| **D01** | **Invoice Generation** | Completing a pickup (`PUT /api/pickups/:id/complete`) atomically marks the pickup as `completed` and creates a pending payment invoice with the corresponding tariff. `POST /api/payments` idempotently returns existing invoice if already generated. |
+| **BR01** | **Pending Payment Block** | A household with any pending unpaid payment for a completed pickup cannot create a new pickup (`POST /api/pickups`). Returns `409 Conflict` (`HOUSEHOLD_PENDING_PAYMENT`). |
+| **BR02** | **Pending State for Scheduling** | Only pickups with status `pending` can be scheduled (`PUT /api/pickups/:id/schedule`). Other states return `409 Conflict` (`INVALID_STATE_TRANSITION`). |
+| **BR03** | **Electronic Safety Check** | Electronic waste pickups (`type: electronic`) can only be scheduled if effective `safety_check` is `true`. (Creating an electronic pickup allows `safety_check: false`; scheduling requires `safety_check: true`). Returns `409 Conflict` (`SAFETY_CHECK_REQUIRED`) if false. |
+| **BR04** | **Atomic Completion & Invoicing** | Completing a pickup (`PUT /api/pickups/:id/complete`) atomically marks the pickup as `completed` and creates a pending payment invoice in a single database transaction. Standard waste (`organic`, `plastic`, `paper`) = **Rp 50,000.00**; Electronic waste (`electronic`) = **Rp 100,000.00**. |
+| **BR05** | **Proof Upload for Confirmation** | Confirming a payment (`PUT /api/payments/:id/confirm`) strictly requires a valid local proof image (JPEG/PNG, $\le 5\text{MB}$, $\le 10,000\text{px}$). |
+| **D01** | **Idempotent Invoice Endpoint** | `POST /api/payments` ensures an invoice exists for a completed pickup (returns `201 Created` if newly generated, or `200 OK` if already exists). |
 | **D08** | **Revenue Aggregation** | Payment summary report calculates `total_revenue` by strictly summing amounts from payments with `status = 'paid'`. |
 
 ---
@@ -101,7 +102,7 @@ The API will be accessible at `http://localhost:8080`.
 
 ### Prerequisites
 - **Go**: 1.24+ (tested on Go 1.24 and 1.27)
-- **PostgreSQL**: 16+
+- **PostgreSQL**: 16+ or Docker
 - **Make**: Standard GNU make
 
 ### Step-by-Step Setup
@@ -144,7 +145,7 @@ The API will be accessible at `http://localhost:8080`.
 
 ---
 
-## 📚 API Endpoints Catalog
+## 📚 API Endpoints Catalog (14 Business Endpoints + Health + Proof Serving)
 
 All responses follow a standard envelope:
 
@@ -165,9 +166,9 @@ All responses follow a standard envelope:
   "data": [ ... ],
   "meta": {
     "page": 1,
-    "limit": 10,
+    "limit": 20,
     "total": 25,
-    "total_pages": 3
+    "total_pages": 2
   }
 }
 ```
@@ -177,7 +178,7 @@ All responses follow a standard envelope:
 {
   "success": false,
   "code": "VALIDATION_ERROR",
-  "message": "invalid request body",
+  "message": "validation failed",
   "errors": [
     { "field": "owner_name", "message": "owner_name is required" }
   ]
@@ -187,7 +188,7 @@ All responses follow a standard envelope:
 ---
 
 ### 1. Health Check
-- `GET /healthz` - Returns service health status.
+- `GET /health` - Returns `{"success":true,"message":"service is healthy"}`.
 
 ---
 
@@ -203,33 +204,41 @@ All responses follow a standard envelope:
   ```
 - `GET /api/households` - List households (query parameters: `page`, `limit`).
 - `GET /api/households/:id` - Retrieve household by UUID.
-- `DELETE /api/households/:id` - Delete household (fails with `409 Conflict` if dependent pickups exist).
+- `DELETE /api/households/:id` - Delete household (fails with `409 Conflict` if dependent pickups/payments exist).
 
 ---
 
 ### 3. Waste Pickups (`/api/pickups`)
 
 - `POST /api/pickups` - Request a waste pickup.
-  - Allowed `waste_type`: `organic`, `plastic`, `paper`, `electronic`.
-  - For `electronic`, `"e_waste_safety_confirmed": true` is required.
+  - Allowed `type`: `organic`, `plastic`, `paper`, `electronic`.
+  - For non-electronic: `safety_check` must be omitted.
+  - For `electronic`: `safety_check` is required (`false` or `true`).
+  ```json
+  // Request Non-Electronic
+  {
+    "household_id": "11111111-1111-4111-8111-111111111111",
+    "type": "organic"
+  }
+
+  // Request Electronic
+  {
+    "household_id": "11111111-1111-4111-8111-111111111111",
+    "type": "electronic",
+    "safety_check": false
+  }
+  ```
+- `GET /api/pickups` - List pickups (query parameters: `page`, `limit`, `status`, `household_id`).
+- `PUT /api/pickups/:id/schedule` - Schedule a pending pickup.
+  - For `electronic`: `safety_check` can be updated to `true`.
   ```json
   // Request
   {
-    "household_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    "waste_type": "electronic",
-    "notes": "Old computer monitor",
-    "e_waste_safety_confirmed": true
+    "pickup_date": "2026-10-15T09:00:00+07:00",
+    "safety_check": true
   }
   ```
-- `GET /api/pickups` - List pickups (query parameters: `page`, `limit`, `status`, `waste_type`, `household_id`).
-- `PUT /api/pickups/:id/schedule` - Schedule a pickup.
-  ```json
-  // Request
-  {
-    "scheduled_date": "2026-10-15T09:00:00Z"
-  }
-  ```
-- `PUT /api/pickups/:id/cancel` - Cancel a pickup (allowed only from `pending` or `scheduled`).
+- `PUT /api/pickups/:id/cancel` - Cancel a pending or scheduled pickup.
 - `PUT /api/pickups/:id/complete` - Mark pickup as completed and atomically generate invoice.
   ```json
   // Response 200 OK
@@ -238,13 +247,25 @@ All responses follow a standard envelope:
     "message": "pickup completed successfully",
     "data": {
       "pickup": {
-        "id": "...",
-        "status": "completed"
+        "id": "22222222-2222-4222-8222-222222222222",
+        "household_id": "11111111-1111-4111-8111-111111111111",
+        "type": "organic",
+        "status": "completed",
+        "pickup_date": "2026-10-08T02:00:00Z",
+        "safety_check": null,
+        "created_at": "2026-10-07T08:00:00Z",
+        "updated_at": "2026-10-08T03:00:00Z"
       },
       "payment": {
-        "id": "...",
+        "id": "33333333-3333-4333-8333-333333333333",
+        "household_id": "11111111-1111-4111-8111-111111111111",
+        "waste_id": "22222222-2222-4222-8222-222222222222",
         "amount": "50000.00",
-        "status": "pending"
+        "payment_date": null,
+        "status": "pending",
+        "proof_file_url": null,
+        "created_at": "2026-10-08T03:00:00Z",
+        "updated_at": "2026-10-08T03:00:00Z"
       }
     }
   }
@@ -258,10 +279,12 @@ All responses follow a standard envelope:
   ```json
   // Request
   {
-    "pickup_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    "household_id": "11111111-1111-4111-8111-111111111111",
+    "waste_id": "22222222-2222-4222-8222-222222222222",
+    "amount": "50000.00"
   }
   ```
-- `GET /api/payments` - List payments (query parameters: `page`, `limit`, `status`).
+- `GET /api/payments` - List payments (query parameters: `page`, `limit`, `status`, `household_id`, `start_date`, `end_date`).
 - `PUT /api/payments/:id/confirm` - Confirm payment by uploading proof of payment (`multipart/form-data` with field `proof`). Validates file size ($\le 5\text{MB}$), MIME type (`image/jpeg`, `image/png`), and image dimensions ($\le 10,000\text{px}$, $\le 20\text{MP}$).
 - `GET /uploads/payment-proofs/:filename` - Static route to view uploaded payment proof image.
 
@@ -300,7 +323,7 @@ npx newman run postman/geu-waste-api.postman_collection.json \
 |---|---|
 | `make build` | Build all Go binaries (`bin/api`, `bin/migrate`, `bin/seed`) |
 | `make run` | Run API server locally with `go run ./cmd/api` |
-| `make test` | Run all unit & integration tests with race detector |
+| `make test` | Run all unit tests with race detector |
 | `make migrate-up` | Run all pending database migrations |
 | `make migrate-down` | Rollback the latest migration batch |
 | `make seed` | Execute deterministic database seed runner |
