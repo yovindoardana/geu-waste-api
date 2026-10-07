@@ -23,3 +23,13 @@ go.work.sum
 
 # env file
 .env
+
+# Local build artifacts
+bin/
+
+# Runtime uploads
+uploads/*
+!uploads/.gitkeep
+
+# Graphify artifacts
+graphify-out/

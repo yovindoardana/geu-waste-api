@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: geu_waste_postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-geu_waste}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-geu_waste}"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: geu_waste_migrate
+    command: ["/app/migrate", "up"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-geu_waste}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_SSLMODE: disable
+      MIGRATIONS_DIR: /app/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: geu_waste_app
+    command: ["/app/api"]
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-geu_waste}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_SSLMODE: disable
+      UPLOAD_DIR: /app/uploads/payment-proofs
+      DB_CONNECT_TIMEOUT: 5s
+      SHUTDOWN_TIMEOUT: 10s
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - upload_data:/app/uploads/payment-proofs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: geu_waste_seed
+    profiles:
+      - tools
+    command: ["/app/seed"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-geu_waste}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_SSLMODE: disable
+      UPLOAD_DIR: /app/uploads/payment-proofs
+    volumes:
+      - upload_data:/app/uploads/payment-proofs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  postgres_data:
+  upload_data:
