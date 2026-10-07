@@ -15,20 +15,33 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/yovindoardana/geu-waste-api/internal/domain"
-	"github.com/yovindoardana/geu-waste-api/internal/repository/postgres"
 	"github.com/yovindoardana/geu-waste-api/internal/validator"
 )
 
 var amountRegex = regexp.MustCompile(`^[0-9]+(\.[0-9]{1,2})?$`)
 
+// PaymentRepository defines repository operations required by PaymentService.
+type PaymentRepository interface {
+	FindByID(ctx context.Context, id string) (*domain.Payment, error)
+	ConfirmPayment(ctx context.Context, paymentID string, proofFileURL string, paymentDate time.Time) (*domain.Payment, error)
+	CompletePickupAndCreatePayment(ctx context.Context, pickupID string, paymentID string, tariff decimal.Decimal, now time.Time) (*domain.Pickup, *domain.Payment, error)
+	EnsurePaymentForPickup(ctx context.Context, paymentID string, householdID string, wasteID string, amount decimal.Decimal, now time.Time) (*domain.Payment, bool, error)
+	FindAll(ctx context.Context, filter domain.PaymentFilter) ([]domain.Payment, int64, error)
+}
+
+// PickupRepository defines pickup operations required by PaymentService.
+type PickupRepository interface {
+	FindByID(ctx context.Context, id string) (*domain.Pickup, error)
+}
+
 // PaymentService handles payment and invoice business logic.
 type PaymentService struct {
-	repo       *postgres.PaymentRepository
-	pickupRepo *postgres.PickupRepository
+	repo       PaymentRepository
+	pickupRepo PickupRepository
 }
 
 // NewPaymentService creates a new PaymentService.
-func NewPaymentService(repo *postgres.PaymentRepository, pickupRepo *postgres.PickupRepository) *PaymentService {
+func NewPaymentService(repo PaymentRepository, pickupRepo PickupRepository) *PaymentService {
 	return &PaymentService{
 		repo:       repo,
 		pickupRepo: pickupRepo,

@@ -1,15 +1,25 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	migratepostgres "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/lib/pq"
 	"github.com/shopspring/decimal"
 	"github.com/yovindoardana/geu-waste-api/internal/config"
 	"github.com/yovindoardana/geu-waste-api/internal/domain"
@@ -17,39 +27,197 @@ import (
 	"github.com/yovindoardana/geu-waste-api/internal/service"
 )
 
+var (
+	migrateOnce sync.Once
+	migrateErr  error
+)
+
+var sampleValidPNG = []byte{
+	0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+	0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+	0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+	0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+	0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41,
+	0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+	0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
+	0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+	0x42, 0x60, 0x82,
+}
+
+func checkTestDatabaseSafety(testDBName, appDBName string) error {
+	if testDBName == appDBName || testDBName == "geu_waste" {
+		return fmt.Errorf("FATAL SAFETY CHECK: Integration tests are forbidden from executing against application database %q. Target must be an isolated test database (default: geu_waste_test)", testDBName)
+	}
+	return nil
+}
+
 func setupTestDB(t *testing.T) (*pgxpool.Pool, func()) {
 	t.Helper()
+
+	testDBName := os.Getenv("TEST_DB_NAME")
+	if testDBName == "" {
+		testDBName = "geu_waste_test"
+	}
+
+	appDBName := os.Getenv("DB_NAME")
+	if appDBName == "" {
+		appDBName = "geu_waste"
+	}
+
+	// SAFETY RULE: Strictly refuse to execute tests against application or production DB
+	if err := checkTestDatabaseSafety(testDBName, appDBName); err != nil {
+		t.Fatalf("%v", err)
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
-		// Fallback for direct integration run
 		cfg = &config.Config{
-			AppEnv:           "development",
+			AppEnv:           "test",
 			AppPort:          8080,
 			DBHost:           "localhost",
 			DBPort:           5432,
-			DBName:           "geu_waste",
+			DBName:           testDBName,
 			DBUser:           "postgres",
 			DBPassword:       "postgres",
 			DBSSLMode:        "disable",
-			UploadDir:        os.TempDir(),
+			UploadDir:        t.TempDir(),
 			DBConnectTimeout: 5 * time.Second,
 			ShutdownTimeout:  10 * time.Second,
 		}
+	} else {
+		// Override DBName to isolated test database
+		cfg.DBName = testDBName
 	}
 
+	// 1. Ensure test database exists by querying admin DB (postgres)
+	adminDSN := fmt.Sprintf("postgres://%s:%s@%s:%d/postgres?sslmode=%s",
+		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBSSLMode)
+
+	adminDB, err := sql.Open("postgres", adminDSN)
+	if err != nil {
+		t.Fatalf("Failed to connect to PostgreSQL admin database: %v", err)
+	}
+	defer adminDB.Close()
+
+	var exists bool
+	err = adminDB.QueryRow(`SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)`, testDBName).Scan(&exists)
+	if err != nil {
+		t.Fatalf("Failed to check if test database exists: %v", err)
+	}
+	if !exists {
+		_, err = adminDB.Exec(fmt.Sprintf(`CREATE DATABASE "%s"`, testDBName))
+		if err != nil {
+			t.Fatalf("Failed to create test database %q: %v", testDBName, err)
+		}
+	}
+
+	// 2. Apply migrations to test database once per test binary execution
+	migrateOnce.Do(func() {
+		testSQLDSN := cfg.DSN()
+		testSQLDB, err := sql.Open("postgres", testSQLDSN)
+		if err != nil {
+			migrateErr = fmt.Errorf("failed to open sql connection for test migration: %w", err)
+			return
+		}
+		defer testSQLDB.Close()
+
+		driver, err := migratepostgres.WithInstance(testSQLDB, &migratepostgres.Config{
+			MigrationsTable: "schema_migrations",
+		})
+		if err != nil {
+			migrateErr = fmt.Errorf("failed to create migration driver: %w", err)
+			return
+		}
+
+		migrationsDir := os.Getenv("MIGRATIONS_DIR")
+		if migrationsDir == "" {
+			if _, err := os.Stat("migrations"); err == nil {
+				migrationsDir = "migrations"
+			} else if _, err := os.Stat("../../migrations"); err == nil {
+				migrationsDir = "../../migrations"
+			} else {
+				migrationsDir = "migrations"
+			}
+		}
+		absPath, err := filepath.Abs(migrationsDir)
+		if err != nil {
+			migrateErr = fmt.Errorf("failed to resolve migrations dir %q: %w", migrationsDir, err)
+			return
+		}
+
+		m, err := migrate.NewWithDatabaseInstance("file://"+absPath, testDBName, driver)
+		if err != nil {
+			migrateErr = fmt.Errorf("failed to initialize migrate engine: %w", err)
+			return
+		}
+
+		if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+			migrateErr = fmt.Errorf("failed to apply migrations up to test db: %w", err)
+			return
+		}
+	})
+
+	if migrateErr != nil {
+		t.Fatalf("Test migration setup failed: %v", migrateErr)
+	}
+
+	// 3. Connect pgx connection pool to test database
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	pool, err := postgres.NewPool(ctx, cfg)
 	if err != nil {
-		t.Fatalf("Failed to connect to PostgreSQL test database: %v", err)
+		t.Fatalf("Failed to connect pgx pool to test database %q: %v", testDBName, err)
+	}
+
+	// 4. Truncate tables to ensure isolated and repeatable test state
+	truncateCtx, truncateCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer truncateCancel()
+	_, err = pool.Exec(truncateCtx, `TRUNCATE TABLE payments, waste_pickups, households CASCADE`)
+	if err != nil {
+		t.Fatalf("Failed to truncate tables in test database: %v", err)
 	}
 
 	cleanup := func() {
+		cleanCtx, cleanCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanCancel()
+		_, _ = pool.Exec(cleanCtx, `TRUNCATE TABLE payments, waste_pickups, households CASCADE`)
 		pool.Close()
 	}
 
 	return pool, cleanup
+}
+
+func createTestMultipartFileHeader(t *testing.T, filename string, content []byte) *multipart.FileHeader {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("proof", filename)
+	if err != nil {
+		t.Fatalf("failed to create form file: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("failed to write part content: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("failed to close writer: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", "/test", &body)
+	if err != nil {
+		t.Fatalf("failed to create test request: %v", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	if err := req.ParseMultipartForm(10 << 20); err != nil {
+		t.Fatalf("failed to parse multipart form: %v", err)
+	}
+
+	files := req.MultipartForm.File["proof"]
+	if len(files) == 0 {
+		t.Fatalf("no files in parsed multipart form")
+	}
+	return files[0]
 }
 
 func TestAtomicCompletionAndBilling(t *testing.T) {
@@ -563,52 +731,44 @@ func TestPaymentConfirmationWithProof_StorageAndDatabaseHandling(t *testing.T) {
 		t.Fatalf("failed to complete pickup: %v", err)
 	}
 
-	tempDir, err := os.MkdirTemp("", "proof_test_*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
 
-	// 1. Success case: Confirmation updates DB to paid and file exists on disk
-	samplePNG := []byte{
-		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-		0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
-		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-		0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
-		0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41,
-		0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
-		0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
-		0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
-		0x42, 0x60, 0x82,
-	}
-
-	// Perform direct confirmation through repository
-	confirmDate := now.Add(2 * time.Hour)
-	finalFilename := uuid.New().String() + ".png"
-	finalFilePath := filepath.Join(tempDir, finalFilename)
-	if err := os.WriteFile(finalFilePath, samplePNG, 0644); err != nil {
-		t.Fatalf("failed to write test final file: %v", err)
-	}
-	proofURL := "/uploads/payment-proofs/" + finalFilename
-
-	confirmedPayment, err := paymentRepo.ConfirmPayment(ctx, completeRes.Payment.ID, proofURL, confirmDate)
+	// 1. Success case through PaymentService: writes file to staging, promotes to final, confirms DB, file exists on disk
+	fileHeader := createTestMultipartFileHeader(t, "proof.png", sampleValidPNG)
+	confirmedPayment, err := paymentSvc.ConfirmPaymentWithProof(ctx, completeRes.Payment.ID, fileHeader, tempDir)
 	if err != nil {
 		t.Fatalf("expected successful confirmation, got %v", err)
 	}
 	if confirmedPayment.Status != domain.PaymentStatusPaid {
 		t.Errorf("expected paid status, got %s", confirmedPayment.Status)
 	}
+	if confirmedPayment.ProofFileURL == nil || *confirmedPayment.ProofFileURL == "" {
+		t.Fatalf("expected non-empty ProofFileURL")
+	}
 
-	// Verify file really exists
-	if _, err := os.Stat(finalFilePath); os.IsNotExist(err) {
-		t.Errorf("expected proof file to exist on disk at %s", finalFilePath)
+	// Verify file really exists on disk
+	finalDiskPath := filepath.Join(tempDir, filepath.Base(*confirmedPayment.ProofFileURL))
+	if _, err := os.Stat(finalDiskPath); os.IsNotExist(err) {
+		t.Errorf("expected proof file to exist on disk at %s", finalDiskPath)
 	}
 
 	// 2. Repeat confirmation must be rejected (409 INVALID_STATE_TRANSITION)
-	_, err = paymentRepo.ConfirmPayment(ctx, completeRes.Payment.ID, proofURL, confirmDate)
+	repeatHeader := createTestMultipartFileHeader(t, "repeat.png", sampleValidPNG)
+	_, err = paymentSvc.ConfirmPaymentWithProof(ctx, completeRes.Payment.ID, repeatHeader, tempDir)
 	if err != domain.ErrInvalidStateTransition {
 		t.Errorf("expected ErrInvalidStateTransition on second confirm, got %v", err)
 	}
 }
 
+func TestSafetyCheck_RefuseAppDatabase(t *testing.T) {
+	if err := checkTestDatabaseSafety("geu_waste", "geu_waste"); err == nil {
+		t.Errorf("expected error when testDBName matches app database name, got nil")
+	}
+	if err := checkTestDatabaseSafety("geu_waste", "geu_waste_other"); err == nil {
+		t.Errorf("expected error when testDBName is geu_waste, got nil")
+	}
+	if err := checkTestDatabaseSafety("geu_waste_test", "geu_waste"); err != nil {
+		t.Errorf("expected valid test db name to pass safety check, got %v", err)
+	}
+}
 
