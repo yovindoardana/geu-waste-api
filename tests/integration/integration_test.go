@@ -382,3 +382,80 @@ func TestReportsAggregation(t *testing.T) {
 		t.Errorf("expected currency IDR, got %s", paymentSummary.Currency)
 	}
 }
+
+func TestConcurrentCreateAndCompleteOnSameHousehold(t *testing.T) {
+	pool, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	householdRepo := postgres.NewHouseholdRepository(pool)
+	pickupRepo := postgres.NewPickupRepository(pool)
+	paymentRepo := postgres.NewPaymentRepository(pool)
+	pickupSvc := service.NewPickupService(pickupRepo)
+	paymentSvc := service.NewPaymentService(paymentRepo, pickupRepo)
+
+	now := time.Now().UTC()
+	household := &domain.Household{
+		ID:        uuid.New().String(),
+		OwnerName: "Race Household",
+		Address:   "Jl. Balapan No. 7",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := householdRepo.Create(ctx, household); err != nil {
+		t.Fatalf("failed to create household: %v", err)
+	}
+
+	// Create initial scheduled pickup
+	typeStr := domain.WasteTypeOrganic
+	p1, err := pickupSvc.CreatePickup(ctx, domain.CreatePickupRequest{
+		HouseholdID: &household.ID,
+		Type:        &typeStr,
+	})
+	if err != nil {
+		t.Fatalf("failed to create p1: %v", err)
+	}
+	scheduledDate := now.Add(time.Hour)
+	if _, err := pickupRepo.UpdateSchedule(ctx, p1.ID, scheduledDate, nil, now); err != nil {
+		t.Fatalf("failed to schedule p1: %v", err)
+	}
+
+	// Race: Complete p1 (which creates pending payment) vs Create p2 on same household
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var completeErr error
+	var createErr error
+
+	start := make(chan struct{})
+
+	go func() {
+		defer wg.Done()
+		<-start
+		_, completeErr = paymentSvc.CompletePickup(ctx, p1.ID)
+	}()
+
+	go func() {
+		defer wg.Done()
+		<-start
+		_, createErr = pickupSvc.CreatePickup(ctx, domain.CreatePickupRequest{
+			HouseholdID: &household.ID,
+			Type:        &typeStr,
+		})
+	}()
+
+	close(start)
+	wg.Wait()
+
+	// Completion must always succeed for the valid scheduled pickup
+	if completeErr != nil {
+		t.Errorf("expected completion to succeed, got %v", completeErr)
+	}
+
+	// Create pickup will either succeed (if it executed before completion locked the household)
+	// or return ErrHouseholdPendingPayment (if completion committed first and created pending payment)
+	if createErr != nil && createErr != domain.ErrHouseholdPendingPayment {
+		t.Errorf("unexpected error on create pickup: %v", createErr)
+	}
+}
+
