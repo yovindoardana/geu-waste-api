@@ -1,0 +1,662 @@
+{
+  "info": {
+    "_postman_id": "8c4e5f2a-7d1b-4f9e-9a2c-1d3e5f7a9b02",
+    "name": "GEU Waste API",
+    "description": "Comprehensive Postman test collection for GEU Waste Management System API backend including Households, Pickups, Payments, Reports, and Proof Uploads.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Healthz",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Response status is healthy\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"healthy\");",
+                  "    pm.expect(jsonData.service).to.eql(\"geu-waste-api\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/healthz",
+              "host": ["{{base_url}}"],
+              "path": ["healthz"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Households",
+      "item": [
+        {
+          "name": "Create Household",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Household created successfully\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.have.property(\"id\");",
+                  "    pm.environment.set(\"household_id\", jsonData.data.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"owner_name\": \"Budi Santoso\",\n  \"address\": \"Jl. Merdeka No. 45, RT 02 / RW 05, Bandung\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/households",
+              "host": ["{{base_url}}"],
+              "path": ["api", "households"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Households",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"List contains items and pagination metadata\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an(\"array\");",
+                  "    pm.expect(jsonData.meta).to.have.property(\"page\");",
+                  "    pm.expect(jsonData.meta).to.have.property(\"total\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/households?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "households"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Household by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Household data matches ID\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.id).to.eql(pm.environment.get(\"household_id\"));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/households/{{household_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "households", "{{household_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Pickups Lifecycle",
+      "item": [
+        {
+          "name": "Create Pickup Request (Organic)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Pickup created with status pending\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.status).to.eql(\"pending\");",
+                  "    pm.expect(jsonData.data.waste_type).to.eql(\"organic\");",
+                  "    pm.environment.set(\"pickup_id\", jsonData.data.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"household_id\": \"{{household_id}}\",\n  \"waste_type\": \"organic\",\n  \"notes\": \"Organic kitchen waste in green bag\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pickups",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pickups"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Pickups (Filtered)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Pickup list returned\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an(\"array\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/pickups?status=pending&waste_type=organic&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pickups"],
+              "query": [
+                { "key": "status", "value": "pending" },
+                { "key": "waste_type", "value": "organic" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Schedule Pickup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Pickup transitioned to scheduled\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.status).to.eql(\"scheduled\");",
+                  "    pm.expect(jsonData.data.scheduled_date).to.not.be.null;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scheduled_date\": \"2026-10-15T09:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pickups/{{pickup_id}}/schedule",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pickups", "{{pickup_id}}", "schedule"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Pickup & Generate Invoice",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Pickup completed and invoice generated with tariff 50000.00\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.pickup.status).to.eql(\"completed\");",
+                  "    pm.expect(jsonData.data.payment.amount).to.eql(\"50000.00\");",
+                  "    pm.expect(jsonData.data.payment.status).to.eql(\"pending\");",
+                  "    pm.environment.set(\"payment_id\", jsonData.data.payment.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/pickups/{{pickup_id}}/complete",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pickups", "{{pickup_id}}", "complete"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Payments & Proofs",
+      "item": [
+        {
+          "name": "Ensure Payment (Idempotent)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 201\", function () {",
+                  "    pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test(\"Payment returned with amount string\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.have.property(\"amount\");",
+                  "    pm.expect(jsonData.data.status).to.eql(\"pending\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickup_id\": \"{{pickup_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Payments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Payment records returned\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an(\"array\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments?status=pending&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments"],
+              "query": [
+                { "key": "status", "value": "pending" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Payment with Proof Upload",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Payment confirmed with status paid and proof_url\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.status).to.eql(\"paid\");",
+                  "    pm.expect(jsonData.data.proof_url).to.not.be.null;",
+                  "    var parts = jsonData.data.proof_url.split('/');",
+                  "    var filename = parts[parts.length - 1];",
+                  "    pm.environment.set(\"proof_filename\", filename);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "proof",
+                  "type": "file",
+                  "src": "postman/assets/sample-proof.png"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/{{payment_id}}/confirm",
+              "host": ["{{base_url}}"],
+              "path": ["api", "payments", "{{payment_id}}", "confirm"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "View Payment Proof Asset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Content type is image\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"image/\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/uploads/payment-proofs/{{proof_filename}}",
+              "host": ["{{base_url}}"],
+              "path": ["uploads", "payment-proofs", "{{proof_filename}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Reports & Aggregations",
+      "item": [
+        {
+          "name": "Waste Summary Report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Waste report contains exactly 16 buckets in canonical order\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.items).to.be.an(\"array\").with.lengthOf(16);",
+                  "    pm.expect(jsonData.data.total_pickups).to.be.a(\"number\");",
+                  "    pm.expect(jsonData.data.items[0].waste_type).to.eql(\"organic\");",
+                  "    pm.expect(jsonData.data.items[0].status).to.eql(\"pending\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reports/waste-summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "waste-summary"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Payment Summary Report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Payment report contains 3 statuses and string total revenue\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.currency).to.eql(\"IDR\");",
+                  "    pm.expect(jsonData.data.items).to.be.an(\"array\").with.lengthOf(3);",
+                  "    pm.expect(jsonData.data.total_revenue).to.be.a(\"string\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reports/payment-summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "payment-summary"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Business Rules & Error Validation",
+      "item": [
+        {
+          "name": "BR02: Reject E-Waste Without Safety Confirmation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 422\", function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "pm.test(\"Returns BUSINESS_RULE_VIOLATION\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.code).to.eql(\"BUSINESS_RULE_VIOLATION\");",
+                  "    pm.expect(jsonData.message).to.include(\"electronic\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"household_id\": \"{{household_id}}\",\n  \"waste_type\": \"electronic\",\n  \"notes\": \"Old CRT television\",\n  \"e_waste_safety_confirmed\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pickups",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pickups"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Strict JSON: Reject Unknown Field",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Returns VALIDATION_ERROR\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.code).to.eql(\"VALIDATION_ERROR\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"owner_name\": \"Andi\",\n  \"address\": \"Jl. Test No 1\",\n  \"unknown_hack_field\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/households",
+              "host": ["{{base_url}}"],
+              "path": ["api", "households"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid UUID Format",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test(\"Returns VALIDATION_ERROR\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.code).to.eql(\"VALIDATION_ERROR\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/households/not-a-valid-uuid",
+              "host": ["{{base_url}}"],
+              "path": ["api", "households", "not-a-valid-uuid"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
