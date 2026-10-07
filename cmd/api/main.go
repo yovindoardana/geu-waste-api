@@ -98,16 +98,19 @@ func setupRouter(dbPool *pgxpool.Pool, uploadDir string) *gin.Engine {
 		householdRepo := postgres.NewHouseholdRepository(dbPool)
 		pickupRepo := postgres.NewPickupRepository(dbPool)
 		paymentRepo := postgres.NewPaymentRepository(dbPool)
+		reportRepo := postgres.NewReportRepository(dbPool)
 
 		// Services
 		householdSvc := service.NewHouseholdService(householdRepo)
 		pickupSvc := service.NewPickupService(pickupRepo)
 		paymentSvc := service.NewPaymentService(paymentRepo, pickupRepo)
+		reportSvc := service.NewReportService(reportRepo)
 
 		// Handlers
 		householdHandler := handler.NewHouseholdHandler(householdSvc)
 		pickupHandler := handler.NewPickupHandler(pickupSvc, paymentSvc)
 		paymentHandler := handler.NewPaymentHandler(paymentSvc, uploadDir)
+		reportHandler := handler.NewReportHandler(reportSvc)
 
 		// Household routes
 		api.POST("/households", householdHandler.Create)
@@ -126,6 +129,10 @@ func setupRouter(dbPool *pgxpool.Pool, uploadDir string) *gin.Engine {
 		api.POST("/payments", paymentHandler.CreateOrEnsure)
 		api.GET("/payments", paymentHandler.List)
 		api.PUT("/payments/:id/confirm", paymentHandler.Confirm)
+
+		// Report routes
+		api.GET("/reports/waste-summary", reportHandler.WasteSummary)
+		api.GET("/reports/payment-summary", reportHandler.PaymentSummary)
 	}
 
 	return router
