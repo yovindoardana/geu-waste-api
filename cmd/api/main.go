@@ -15,6 +15,7 @@ import (
 	"github.com/yovindoardana/geu-waste-api/internal/config"
 	"github.com/yovindoardana/geu-waste-api/internal/handler"
 	"github.com/yovindoardana/geu-waste-api/internal/repository/postgres"
+	"github.com/yovindoardana/geu-waste-api/internal/service"
 )
 
 func main() {
@@ -81,8 +82,23 @@ func setupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	router.NoRoute(handler.NoRouteHandler())
 	router.NoMethod(handler.NoMethodHandler())
 
+	// Health check
 	healthHandler := handler.NewHealthHandler(dbPool)
 	router.GET("/health", healthHandler.Health)
+
+	// API routes group
+	api := router.Group("/api")
+	{
+		// Household domain
+		householdRepo := postgres.NewHouseholdRepository(dbPool)
+		householdSvc := service.NewHouseholdService(householdRepo)
+		householdHandler := handler.NewHouseholdHandler(householdSvc)
+
+		api.POST("/households", householdHandler.Create)
+		api.GET("/households", householdHandler.List)
+		api.GET("/households/:id", householdHandler.GetByID)
+		api.DELETE("/households/:id", householdHandler.Delete)
+	}
 
 	return router
 }
