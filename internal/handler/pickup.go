@@ -14,12 +14,16 @@ import (
 
 // PickupHandler handles HTTP requests for waste pickup resources.
 type PickupHandler struct {
-	svc *service.PickupService
+	svc        *service.PickupService
+	paymentSvc *service.PaymentService
 }
 
 // NewPickupHandler creates a new PickupHandler.
-func NewPickupHandler(svc *service.PickupService) *PickupHandler {
-	return &PickupHandler{svc: svc}
+func NewPickupHandler(svc *service.PickupService, paymentSvc *service.PaymentService) *PickupHandler {
+	return &PickupHandler{
+		svc:        svc,
+		paymentSvc: paymentSvc,
+	}
 }
 
 // Create handles POST /api/pickups.
@@ -179,3 +183,42 @@ func (h *PickupHandler) Cancel(c *gin.Context) {
 
 	response.JSON(c, http.StatusOK, "pickup canceled successfully", result)
 }
+
+// Complete handles PUT /api/pickups/:id/complete.
+func (h *PickupHandler) Complete(c *gin.Context) {
+	id, err := validator.ParseUUID(c.Param("id"))
+	if err != nil {
+		validator.HandleValidationError(c, "id", err.Error())
+		return
+	}
+
+	// Validate body is empty or valid JSON {} if Content-Type is provided
+	if c.Request.Body != nil && c.Request.ContentLength > 0 {
+		var emptyBody map[string]any
+		if err := validator.DecodeJSONStrict(c, &emptyBody); err != nil {
+			validator.HandleValidationError(c, "body", err.Error())
+			return
+		}
+		if len(emptyBody) > 0 {
+			validator.HandleValidationError(c, "body", "complete endpoint does not accept body parameters")
+			return
+		}
+	}
+
+	result, err := h.paymentSvc.CompletePickup(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			response.Error(c, http.StatusNotFound, response.CodeResourceNotFound, "pickup not found", nil)
+			return
+		}
+		if errors.Is(err, domain.ErrInvalidStateTransition) {
+			response.Error(c, http.StatusConflict, response.CodeInvalidStateTransition, "cannot complete non-scheduled pickup", nil)
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, response.CodeInternalError, "failed to complete pickup", nil)
+		return
+	}
+
+	response.JSON(c, http.StatusOK, "pickup completed successfully", result)
+}
+

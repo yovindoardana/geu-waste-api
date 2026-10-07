@@ -89,25 +89,37 @@ func setupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	// API routes group
 	api := router.Group("/api")
 	{
-		// Household domain
+		// Repositories
 		householdRepo := postgres.NewHouseholdRepository(dbPool)
-		householdSvc := service.NewHouseholdService(householdRepo)
-		householdHandler := handler.NewHouseholdHandler(householdSvc)
+		pickupRepo := postgres.NewPickupRepository(dbPool)
+		paymentRepo := postgres.NewPaymentRepository(dbPool)
 
+		// Services
+		householdSvc := service.NewHouseholdService(householdRepo)
+		pickupSvc := service.NewPickupService(pickupRepo)
+		paymentSvc := service.NewPaymentService(paymentRepo, pickupRepo)
+
+		// Handlers
+		householdHandler := handler.NewHouseholdHandler(householdSvc)
+		pickupHandler := handler.NewPickupHandler(pickupSvc, paymentSvc)
+		paymentHandler := handler.NewPaymentHandler(paymentSvc)
+
+		// Household routes
 		api.POST("/households", householdHandler.Create)
 		api.GET("/households", householdHandler.List)
 		api.GET("/households/:id", householdHandler.GetByID)
 		api.DELETE("/households/:id", householdHandler.Delete)
 
-		// Pickup domain
-		pickupRepo := postgres.NewPickupRepository(dbPool)
-		pickupSvc := service.NewPickupService(pickupRepo)
-		pickupHandler := handler.NewPickupHandler(pickupSvc)
-
+		// Pickup routes
 		api.POST("/pickups", pickupHandler.Create)
 		api.GET("/pickups", pickupHandler.List)
 		api.PUT("/pickups/:id/schedule", pickupHandler.Schedule)
+		api.PUT("/pickups/:id/complete", pickupHandler.Complete)
 		api.PUT("/pickups/:id/cancel", pickupHandler.Cancel)
+
+		// Payment routes
+		api.POST("/payments", paymentHandler.CreateOrEnsure)
+		api.GET("/payments", paymentHandler.List)
 	}
 
 	return router

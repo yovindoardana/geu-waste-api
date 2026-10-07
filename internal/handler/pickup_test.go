@@ -13,11 +13,13 @@ import (
 
 func TestPickupHandler_InvalidRequests(t *testing.T) {
 	svc := service.NewPickupService(nil)
-	h := NewPickupHandler(svc)
+	paymentSvc := service.NewPaymentService(nil, nil)
+	h := NewPickupHandler(svc, paymentSvc)
 
 	router := gin.New()
 	router.POST("/api/pickups", h.Create)
 	router.PUT("/api/pickups/:id/schedule", h.Schedule)
+	router.PUT("/api/pickups/:id/complete", h.Complete)
 	router.PUT("/api/pickups/:id/cancel", h.Cancel)
 
 	t.Run("Create - Reject non-JSON content type", func(t *testing.T) {
@@ -43,6 +45,21 @@ func TestPickupHandler_InvalidRequests(t *testing.T) {
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("expected 400 for invalid UUID, got %d", w.Code)
+		}
+	})
+
+	t.Run("Complete - Reject unexpected body parameters", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		body := map[string]string{
+			"amount": "50000.00",
+		}
+		jsonBytes, _ := json.Marshal(body)
+		req, _ := http.NewRequest("PUT", "/api/pickups/20000000-0000-4000-8000-000000000001/complete", bytes.NewBuffer(jsonBytes))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 for complete with body parameters, got %d", w.Code)
 		}
 	})
 
