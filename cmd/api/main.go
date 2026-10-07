@@ -40,7 +40,7 @@ func main() {
 	log.Printf("Connected to database %s on %s:%d", cfg.DBName, cfg.DBHost, cfg.DBPort)
 
 	// Setup Gin router
-	router := setupRouter(dbPool)
+	router := setupRouter(dbPool, cfg.UploadDir)
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.AppPort),
@@ -72,7 +72,7 @@ func main() {
 	log.Println("Server exited successfully.")
 }
 
-func setupRouter(dbPool *pgxpool.Pool) *gin.Engine {
+func setupRouter(dbPool *pgxpool.Pool, uploadDir string) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger())
 	router.Use(handler.RecoveryMiddleware())
@@ -85,6 +85,11 @@ func setupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 	// Health check
 	healthHandler := handler.NewHealthHandler(dbPool)
 	router.GET("/health", healthHandler.Health)
+
+	// Static uploaded proof serving
+	uploadHandler := handler.NewUploadHandler(uploadDir)
+	router.GET("/uploads/payment-proofs/:filename", uploadHandler.ServeFile)
+	router.HEAD("/uploads/payment-proofs/:filename", uploadHandler.ServeFile)
 
 	// API routes group
 	api := router.Group("/api")
@@ -102,7 +107,7 @@ func setupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		// Handlers
 		householdHandler := handler.NewHouseholdHandler(householdSvc)
 		pickupHandler := handler.NewPickupHandler(pickupSvc, paymentSvc)
-		paymentHandler := handler.NewPaymentHandler(paymentSvc)
+		paymentHandler := handler.NewPaymentHandler(paymentSvc, uploadDir)
 
 		// Household routes
 		api.POST("/households", householdHandler.Create)
@@ -120,6 +125,7 @@ func setupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		// Payment routes
 		api.POST("/payments", paymentHandler.CreateOrEnsure)
 		api.GET("/payments", paymentHandler.List)
+		api.PUT("/payments/:id/confirm", paymentHandler.Confirm)
 	}
 
 	return router

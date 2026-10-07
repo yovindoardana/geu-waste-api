@@ -390,3 +390,85 @@ func (r *PaymentRepository) FindAll(ctx context.Context, filter domain.PaymentFi
 
 	return payments, total, nil
 }
+
+// ConfirmPayment confirms a pending payment with proof image URL and payment date atomically.
+func (r *PaymentRepository) ConfirmPayment(
+	ctx context.Context,
+	paymentID string,
+	proofFileURL string,
+	paymentDate time.Time,
+) (*domain.Payment, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Lock payment row
+	queryLock := `
+		SELECT id, household_id, waste_id, amount, payment_date, status, proof_file_url, created_at, updated_at
+		FROM payments
+		WHERE id = $1
+		FOR UPDATE
+	`
+	var p domain.Payment
+	var rawAmount decimal.Decimal
+	err = tx.QueryRow(ctx, queryLock, paymentID).Scan(
+		&p.ID,
+		&p.HouseholdID,
+		&p.WasteID,
+		&rawAmount,
+		&p.PaymentDate,
+		&p.Status,
+		&p.ProofFileURL,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to query payment for update: %w", err)
+	}
+
+	if p.Status != domain.PaymentStatusPending {
+		return nil, domain.ErrInvalidStateTransition
+	}
+
+	updateQuery := `
+		UPDATE payments
+		SET status = $1, payment_date = $2, proof_file_url = $3, updated_at = $2
+		WHERE id = $4
+		RETURNING id, household_id, waste_id, amount, payment_date, status, proof_file_url, created_at, updated_at
+	`
+	var confirmed domain.Payment
+	err = tx.QueryRow(
+		ctx,
+		updateQuery,
+		domain.PaymentStatusPaid,
+		paymentDate,
+		proofFileURL,
+		paymentID,
+	).Scan(
+		&confirmed.ID,
+		&confirmed.HouseholdID,
+		&confirmed.WasteID,
+		&rawAmount,
+		&confirmed.PaymentDate,
+		&confirmed.Status,
+		&confirmed.ProofFileURL,
+		&confirmed.CreatedAt,
+		&confirmed.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update payment to paid: %w", err)
+	}
+	confirmed.Amount = domain.ValueFromDecimal(rawAmount)
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit confirm transaction: %w", err)
+	}
+
+	return &confirmed, nil
+}
+

@@ -2,6 +2,11 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -109,3 +114,94 @@ func (s *PaymentService) GetPayment(ctx context.Context, id string) (*domain.Pay
 func (s *PaymentService) ListPayments(ctx context.Context, filter domain.PaymentFilter) ([]domain.Payment, int64, error) {
 	return s.repo.FindAll(ctx, filter)
 }
+
+// ConfirmPaymentWithProof handles proof validation, staging, atomic confirmation, and persistence (BR05, D11, D12).
+func (s *PaymentService) ConfirmPaymentWithProof(
+	ctx context.Context,
+	paymentID string,
+	fileHeader *multipart.FileHeader,
+	uploadDir string,
+) (*domain.Payment, error) {
+	// 1. Validate file format and image dimensions
+	ext, err := validator.ValidateProofFile(fileHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Pre-check payment existence and state before file IO
+	existing, err := s.repo.FindByID(ctx, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	if existing.Status != domain.PaymentStatusPending {
+		return nil, domain.ErrInvalidStateTransition
+	}
+
+	// 3. Ensure upload directories exist
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create upload directory: %w", err)
+	}
+
+	// 4. Save file to temporary staging location
+	serverFilename := uuid.New().String() + ext
+	stagingFilename := "staging_" + serverFilename
+	stagingPath := filepath.Join(uploadDir, stagingFilename)
+	finalPath := filepath.Join(uploadDir, serverFilename)
+
+	srcFile, err := fileHeader.Open()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open upload stream: %w", err)
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(stagingPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create staging file: %w", err)
+	}
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		dstFile.Close()
+		os.Remove(stagingPath)
+		return nil, fmt.Errorf("failed to save staging file: %w", err)
+	}
+	dstFile.Close()
+
+	// 5. Atomic DB confirmation
+	proofURL := "/uploads/payment-proofs/" + serverFilename
+	now := time.Now().UTC()
+
+	confirmed, err := s.repo.ConfirmPayment(ctx, paymentID, proofURL, now)
+	if err != nil {
+		// Clean up staging file on failure
+		os.Remove(stagingPath)
+		return nil, err
+	}
+
+	// 6. Promote staging file to final filename
+	if err := os.Rename(stagingPath, finalPath); err != nil {
+		// If rename fails, try copy then remove
+		if copyErr := copyFile(stagingPath, finalPath); copyErr == nil {
+			os.Remove(stagingPath)
+		}
+	}
+
+	return confirmed, nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
+}
+

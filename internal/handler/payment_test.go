@@ -13,11 +13,12 @@ import (
 
 func TestPaymentHandler_InvalidRequests(t *testing.T) {
 	svc := service.NewPaymentService(nil, nil)
-	h := NewPaymentHandler(svc)
+	h := NewPaymentHandler(svc, "/tmp/uploads")
 
 	router := gin.New()
 	router.POST("/api/payments", h.CreateOrEnsure)
 	router.GET("/api/payments", h.List)
+	router.PUT("/api/payments/:id/confirm", h.Confirm)
 
 	t.Run("Create - Non-JSON content type", func(t *testing.T) {
 		w := httptest.NewRecorder()
@@ -67,4 +68,15 @@ func TestPaymentHandler_InvalidRequests(t *testing.T) {
 			t.Errorf("expected 400 when start_date > end_date, got %d", w.Code)
 		}
 	})
+
+	t.Run("Confirm - Invalid UUID", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("PUT", "/api/payments/invalid-uuid/confirm", nil)
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 for invalid UUID, got %d", w.Code)
+		}
+	})
 }
+
