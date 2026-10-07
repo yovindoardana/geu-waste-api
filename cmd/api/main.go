@@ -98,6 +98,16 @@ func setupRouter(dbPool *pgxpool.Pool) *gin.Engine {
 		api.GET("/households", householdHandler.List)
 		api.GET("/households/:id", householdHandler.GetByID)
 		api.DELETE("/households/:id", householdHandler.Delete)
+
+		// Pickup domain
+		pickupRepo := postgres.NewPickupRepository(dbPool)
+		pickupSvc := service.NewPickupService(pickupRepo)
+		pickupHandler := handler.NewPickupHandler(pickupSvc)
+
+		api.POST("/pickups", pickupHandler.Create)
+		api.GET("/pickups", pickupHandler.List)
+		api.PUT("/pickups/:id/schedule", pickupHandler.Schedule)
+		api.PUT("/pickups/:id/cancel", pickupHandler.Cancel)
 	}
 
 	return router
