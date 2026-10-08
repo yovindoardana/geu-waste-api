@@ -34,11 +34,43 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/health",
-              "host": ["{{base_url}}"],
-              "path": ["health"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/health",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "health"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"service is healthy\",\n  \"success\": true\n}"
+            }
+          ]
         }
       ]
     },
@@ -80,11 +112,54 @@
             },
             "url": {
               "raw": "{{base_url}}/api/households",
-              "host": ["{{base_url}}"],
-              "path": ["api", "households"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "households"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"owner_name\": \"Budi Santoso\",\n  \"address\": \"Jl. Merdeka No. 45, RT 02 / RW 05, Bandung\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/households",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "households"
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"household created successfully\",\n  \"data\": {\n    \"id\": \"10000000-0000-4000-8000-000000000001\",\n    \"owner_name\": \"Budi Santoso\",\n    \"address\": \"Jl. Merdeka No. 45, Bandung\",\n    \"created_at\": \"2026-10-07T08:00:00Z\",\n    \"updated_at\": \"2026-10-07T08:00:00Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List Households",
@@ -113,15 +188,65 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/households?page=1&limit=10",
-              "host": ["{{base_url}}"],
-              "path": ["api", "households"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "households"
+              ],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "10" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
               ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/households?page=1&limit=10",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "households"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"households retrieved successfully\",\n  \"data\": [\n    {\n      \"id\": \"10000000-0000-4000-8000-000000000001\",\n      \"owner_name\": \"Budi Santoso\",\n      \"address\": \"Jl. Merdeka No. 45, Bandung\",\n      \"created_at\": \"2026-10-07T08:00:00Z\",\n      \"updated_at\": \"2026-10-07T08:00:00Z\"\n    },\n    {\n      \"id\": \"10000000-0000-4000-8000-000000000002\",\n      \"owner_name\": \"Siti Aminah\",\n      \"address\": \"Jl. Sudirman No. 88, Jakarta\",\n      \"created_at\": \"2026-10-07T08:00:00Z\",\n      \"updated_at\": \"2026-10-07T08:00:00Z\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 2,\n    \"total_pages\": 1\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Get Household by ID",
@@ -148,11 +273,47 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/households/{{household_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["api", "households", "{{household_id}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "households",
+                "{{household_id}}"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/households/{{household_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "households",
+                    "{{household_id}}"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"household retrieved successfully\",\n  \"data\": {\n    \"id\": \"10000000-0000-4000-8000-000000000001\",\n    \"owner_name\": \"Budi Santoso\",\n    \"address\": \"Jl. Merdeka No. 45, Bandung\",\n    \"created_at\": \"2026-10-07T08:00:00Z\",\n    \"updated_at\": \"2026-10-07T08:00:00Z\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -195,11 +356,54 @@
             },
             "url": {
               "raw": "{{base_url}}/api/pickups",
-              "host": ["{{base_url}}"],
-              "path": ["api", "pickups"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pickups"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"household_id\": \"{{household_id}}\",\n  \"type\": \"organic\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/pickups",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "pickups"
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"pickup created successfully\",\n  \"data\": {\n    \"id\": \"20000000-0000-4000-8000-000000000001\",\n    \"household_id\": \"10000000-0000-4000-8000-000000000001\",\n    \"type\": \"organic\",\n    \"status\": \"pending\",\n    \"pickup_date\": null,\n    \"safety_check\": null,\n    \"created_at\": \"2026-10-07T08:00:00Z\",\n    \"updated_at\": \"2026-10-07T08:00:00Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List Pickups (Filtered)",
@@ -226,16 +430,73 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/pickups?status=pending&household_id={{household_id}}&limit=10",
-              "host": ["{{base_url}}"],
-              "path": ["api", "pickups"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pickups"
+              ],
               "query": [
-                { "key": "status", "value": "pending" },
-                { "key": "household_id", "value": "{{household_id}}" },
-                { "key": "limit", "value": "10" }
+                {
+                  "key": "status",
+                  "value": "pending"
+                },
+                {
+                  "key": "household_id",
+                  "value": "{{household_id}}"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
               ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/pickups?status=pending&household_id={{household_id}}&limit=10",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "pickups"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "pending"
+                    },
+                    {
+                      "key": "household_id",
+                      "value": "{{household_id}}"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"pickups retrieved successfully\",\n  \"data\": [\n    {\n      \"id\": \"20000000-0000-4000-8000-000000000001\",\n      \"household_id\": \"10000000-0000-4000-8000-000000000001\",\n      \"type\": \"organic\",\n      \"status\": \"pending\",\n      \"pickup_date\": null,\n      \"safety_check\": null,\n      \"created_at\": \"2026-10-07T08:00:00Z\",\n      \"updated_at\": \"2026-10-07T08:00:00Z\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 1,\n    \"total_pages\": 1\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Schedule Pickup",
@@ -272,11 +533,58 @@
             },
             "url": {
               "raw": "{{base_url}}/api/pickups/{{pickup_id}}/schedule",
-              "host": ["{{base_url}}"],
-              "path": ["api", "pickups", "{{pickup_id}}", "schedule"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pickups",
+                "{{pickup_id}}",
+                "schedule"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pickup_date\": \"2026-10-15T09:00:00+07:00\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/pickups/{{pickup_id}}/schedule",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "pickups",
+                    "{{pickup_id}}",
+                    "schedule"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"pickup scheduled successfully\",\n  \"data\": {\n    \"id\": \"20000000-0000-4000-8000-000000000001\",\n    \"household_id\": \"10000000-0000-4000-8000-000000000001\",\n    \"type\": \"organic\",\n    \"status\": \"scheduled\",\n    \"pickup_date\": \"2026-10-15T09:00:00Z\",\n    \"safety_check\": null,\n    \"created_at\": \"2026-10-07T08:00:00Z\",\n    \"updated_at\": \"2026-10-07T08:30:00Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Complete Pickup & Generate Invoice",
@@ -311,11 +619,53 @@
             },
             "url": {
               "raw": "{{base_url}}/api/pickups/{{pickup_id}}/complete",
-              "host": ["{{base_url}}"],
-              "path": ["api", "pickups", "{{pickup_id}}", "complete"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pickups",
+                "{{pickup_id}}",
+                "complete"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/pickups/{{pickup_id}}/complete",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "pickups",
+                    "{{pickup_id}}",
+                    "complete"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"pickup completed successfully\",\n  \"data\": {\n    \"pickup\": {\n      \"id\": \"20000000-0000-4000-8000-000000000001\",\n      \"household_id\": \"10000000-0000-4000-8000-000000000001\",\n      \"type\": \"organic\",\n      \"status\": \"completed\",\n      \"pickup_date\": \"2026-10-15T09:00:00Z\",\n      \"safety_check\": null,\n      \"created_at\": \"2026-10-07T08:00:00Z\",\n      \"updated_at\": \"2026-10-15T10:00:00Z\"\n    },\n    \"payment\": {\n      \"id\": \"30000000-0000-4000-8000-000000000001\",\n      \"household_id\": \"10000000-0000-4000-8000-000000000001\",\n      \"waste_id\": \"20000000-0000-4000-8000-000000000001\",\n      \"amount\": \"50000.00\",\n      \"payment_date\": null,\n      \"status\": \"pending\",\n      \"proof_file_url\": null,\n      \"created_at\": \"2026-10-15T10:00:00Z\",\n      \"updated_at\": \"2026-10-15T10:00:00Z\"\n    }\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -357,11 +707,54 @@
             },
             "url": {
               "raw": "{{base_url}}/api/payments",
-              "host": ["{{base_url}}"],
-              "path": ["api", "payments"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"household_id\": \"{{household_id}}\",\n  \"waste_id\": \"{{pickup_id}}\",\n  \"amount\": \"50000.00\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/payments",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "payments"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"payment already exists\",\n  \"data\": {\n    \"id\": \"30000000-0000-4000-8000-000000000001\",\n    \"household_id\": \"10000000-0000-4000-8000-000000000001\",\n    \"waste_id\": \"20000000-0000-4000-8000-000000000001\",\n    \"amount\": \"50000.00\",\n    \"payment_date\": null,\n    \"status\": \"pending\",\n    \"proof_file_url\": null,\n    \"created_at\": \"2026-10-15T10:00:00Z\",\n    \"updated_at\": \"2026-10-15T10:00:00Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List Payments",
@@ -388,19 +781,105 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/payments?status=pending&limit=10",
-              "host": ["{{base_url}}"],
-              "path": ["api", "payments"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ],
               "query": [
-                { "key": "status", "value": "pending" },
-                { "key": "limit", "value": "10" },
-                { "key": "page", "value": "1", "disabled": true },
-                { "key": "household_id", "value": "{{household_id}}", "disabled": true },
-                { "key": "start_date", "value": "2026-01-01", "disabled": true },
-                { "key": "end_date", "value": "2026-12-31", "disabled": true }
+                {
+                  "key": "status",
+                  "value": "pending"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "household_id",
+                  "value": "{{household_id}}",
+                  "disabled": true
+                },
+                {
+                  "key": "start_date",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "end_date",
+                  "value": "2026-12-31",
+                  "disabled": true
+                }
               ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/payments?status=pending&limit=10",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "payments"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "pending"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    },
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": true
+                    },
+                    {
+                      "key": "household_id",
+                      "value": "{{household_id}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "start_date",
+                      "value": "2026-01-01",
+                      "disabled": true
+                    },
+                    {
+                      "key": "end_date",
+                      "value": "2026-12-31",
+                      "disabled": true
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"payments retrieved successfully\",\n  \"data\": [\n    {\n      \"id\": \"30000000-0000-4000-8000-000000000001\",\n      \"household_id\": \"10000000-0000-4000-8000-000000000001\",\n      \"waste_id\": \"20000000-0000-4000-8000-000000000001\",\n      \"amount\": \"50000.00\",\n      \"payment_date\": null,\n      \"status\": \"pending\",\n      \"proof_file_url\": null,\n      \"created_at\": \"2026-10-15T10:00:00Z\",\n      \"updated_at\": \"2026-10-15T10:00:00Z\"\n    }\n  ],\n  \"meta\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 1,\n    \"total_pages\": 1\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Confirm Payment with Proof Upload",
@@ -441,11 +920,59 @@
             },
             "url": {
               "raw": "{{base_url}}/api/payments/{{payment_id}}/confirm",
-              "host": ["{{base_url}}"],
-              "path": ["api", "payments", "{{payment_id}}", "confirm"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{payment_id}}",
+                "confirm"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "proof",
+                      "type": "file",
+                      "src": "postman/assets/sample-proof.png"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/payments/{{payment_id}}/confirm",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "payments",
+                    "{{payment_id}}",
+                    "confirm"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"payment confirmed successfully\",\n  \"data\": {\n    \"id\": \"30000000-0000-4000-8000-000000000001\",\n    \"household_id\": \"10000000-0000-4000-8000-000000000001\",\n    \"waste_id\": \"20000000-0000-4000-8000-000000000001\",\n    \"amount\": \"50000.00\",\n    \"payment_date\": \"2026-10-15T11:00:00Z\",\n    \"status\": \"paid\",\n    \"proof_file_url\": \"/uploads/payment-proofs/sample-proof.png\",\n    \"created_at\": \"2026-10-15T10:00:00Z\",\n    \"updated_at\": \"2026-10-15T11:00:00Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "View Payment Proof Asset",
@@ -470,11 +997,47 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/uploads/payment-proofs/{{proof_filename}}",
-              "host": ["{{base_url}}"],
-              "path": ["uploads", "payment-proofs", "{{proof_filename}}"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "uploads",
+                "payment-proofs",
+                "{{proof_filename}}"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/uploads/payment-proofs/{{proof_filename}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "uploads",
+                    "payment-proofs",
+                    "{{proof_filename}}"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "image/png"
+                }
+              ],
+              "cookie": [],
+              "body": "<binary PNG image data>"
+            }
+          ]
         }
       ]
     },
@@ -509,11 +1072,47 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/reports/waste-summary",
-              "host": ["{{base_url}}"],
-              "path": ["api", "reports", "waste-summary"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "waste-summary"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/reports/waste-summary",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "reports",
+                    "waste-summary"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"waste summary report generated successfully\",\n  \"data\": {\n    \"generated_at\": \"2026-10-15T12:00:00Z\",\n    \"items\": [\n      {\n        \"type\": \"organic\",\n        \"status\": \"pending\",\n        \"count\": 1\n      },\n      {\n        \"type\": \"organic\",\n        \"status\": \"scheduled\",\n        \"count\": 0\n      },\n      {\n        \"type\": \"organic\",\n        \"status\": \"completed\",\n        \"count\": 2\n      },\n      {\n        \"type\": \"organic\",\n        \"status\": \"canceled\",\n        \"count\": 0\n      },\n      {\n        \"type\": \"plastic\",\n        \"status\": \"pending\",\n        \"count\": 0\n      },\n      {\n        \"type\": \"plastic\",\n        \"status\": \"scheduled\",\n        \"count\": 1\n      },\n      {\n        \"type\": \"plastic\",\n        \"status\": \"completed\",\n        \"count\": 1\n      },\n      {\n        \"type\": \"plastic\",\n        \"status\": \"canceled\",\n        \"count\": 0\n      },\n      {\n        \"type\": \"paper\",\n        \"status\": \"pending\",\n        \"count\": 0\n      },\n      {\n        \"type\": \"paper\",\n        \"status\": \"scheduled\",\n        \"count\": 0\n      },\n      {\n        \"type\": \"paper\",\n        \"status\": \"completed\",\n        \"count\": 1\n      },\n      {\n        \"type\": \"paper\",\n        \"status\": \"canceled\",\n        \"count\": 0\n      },\n      {\n        \"type\": \"electronic\",\n        \"status\": \"pending\",\n        \"count\": 1\n      },\n      {\n        \"type\": \"electronic\",\n        \"status\": \"scheduled\",\n        \"count\": 0\n      },\n      {\n        \"type\": \"electronic\",\n        \"status\": \"completed\",\n        \"count\": 1\n      },\n      {\n        \"type\": \"electronic\",\n        \"status\": \"canceled\",\n        \"count\": 0\n      }\n    ]\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Payment Summary Report",
@@ -542,11 +1141,47 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/reports/payment-summary",
-              "host": ["{{base_url}}"],
-              "path": ["api", "reports", "payment-summary"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "payment-summary"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/reports/payment-summary",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "reports",
+                    "payment-summary"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"payment summary report generated successfully\",\n  \"data\": {\n    \"generated_at\": \"2026-10-15T12:00:00Z\",\n    \"currency\": \"IDR\",\n    \"total_revenue\": \"200000.00\",\n    \"items\": [\n      {\n        \"status\": \"pending\",\n        \"count\": 2,\n        \"total_amount\": \"100000.00\"\n      },\n      {\n        \"status\": \"paid\",\n        \"count\": 3,\n        \"total_amount\": \"200000.00\"\n      },\n      {\n        \"status\": \"failed\",\n        \"count\": 0,\n        \"total_amount\": \"0.00\"\n      }\n    ]\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -589,11 +1224,54 @@
             },
             "url": {
               "raw": "{{base_url}}/api/pickups",
-              "host": ["{{base_url}}"],
-              "path": ["api", "pickups"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pickups"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"household_id\": \"{{household_id}}\",\n  \"type\": \"electronic\",\n  \"safety_check\": false\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/pickups",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "pickups"
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"pickup created successfully\",\n  \"data\": {\n    \"id\": \"20000000-0000-4000-8000-000000000003\",\n    \"household_id\": \"10000000-0000-4000-8000-000000000001\",\n    \"type\": \"electronic\",\n    \"status\": \"pending\",\n    \"pickup_date\": null,\n    \"safety_check\": false,\n    \"created_at\": \"2026-10-07T08:00:00Z\",\n    \"updated_at\": \"2026-10-07T08:00:00Z\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "BR03: Reject Schedule Electronic with safety_check false",
@@ -629,11 +1307,58 @@
             },
             "url": {
               "raw": "{{base_url}}/api/pickups/20000000-0000-4000-8000-000000000003/schedule",
-              "host": ["{{base_url}}"],
-              "path": ["api", "pickups", "20000000-0000-4000-8000-000000000003", "schedule"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "pickups",
+                "20000000-0000-4000-8000-000000000003",
+                "schedule"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "409 Conflict",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pickup_date\": \"2026-10-15T09:00:00+07:00\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/pickups/20000000-0000-4000-8000-000000000003/schedule",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "pickups",
+                    "20000000-0000-4000-8000-000000000003",
+                    "schedule"
+                  ]
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"code\": \"SAFETY_CHECK_REQUIRED\",\n  \"message\": \"electronic waste requires safety check confirmation before scheduling\",\n  \"errors\": null\n}"
+            }
+          ]
         },
         {
           "name": "Strict JSON: Reject Unknown Field",
@@ -669,11 +1394,54 @@
             },
             "url": {
               "raw": "{{base_url}}/api/households",
-              "host": ["{{base_url}}"],
-              "path": ["api", "households"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "households"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"owner_name\": \"Andi\",\n  \"address\": \"Jl. Test No 1\",\n  \"unknown_hack_field\": true\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/households",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "households"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"code\": \"VALIDATION_ERROR\",\n  \"message\": \"validation failed\",\n  \"errors\": [\n    {\n      \"field\": \"unknown_field\",\n      \"message\": \"unknown field 'unknown_field'\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Invalid UUID Format",
@@ -700,11 +1468,47 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/households/not-a-valid-uuid",
-              "host": ["{{base_url}}"],
-              "path": ["api", "households", "not-a-valid-uuid"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "households",
+                "not-a-valid-uuid"
+              ]
             }
           },
-          "response": []
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/households/not-a-valid-uuid",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "households",
+                    "not-a-valid-uuid"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"code\": \"VALIDATION_ERROR\",\n  \"message\": \"validation failed\",\n  \"errors\": [\n    {\n      \"field\": \"id\",\n      \"message\": \"invalid UUID format\"\n    }\n  ]\n}"
+            }
+          ]
         }
       ]
     }
