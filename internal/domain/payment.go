@@ -30,15 +30,15 @@ func GetTariffForType(wasteType string) decimal.Decimal {
 
 // Payment represents a payment record.
 type Payment struct {
-	ID           string          `json:"id"`
-	HouseholdID  string          `json:"household_id"`
-	WasteID      string          `json:"waste_id"`
-	Amount       DecimalAmount   `json:"amount"`
-	PaymentDate  *time.Time      `json:"payment_date"`
-	Status       string          `json:"status"`
-	ProofFileURL *string         `json:"proof_file_url"`
-	CreatedAt    time.Time       `json:"created_at"`
-	UpdatedAt    time.Time       `json:"updated_at"`
+	ID           string        `json:"id"`
+	HouseholdID  string        `json:"household_id"`
+	WasteID      string        `json:"waste_id"`
+	Amount       DecimalAmount `json:"amount"`
+	PaymentDate  *time.Time    `json:"payment_date"`
+	Status       string        `json:"status"`
+	ProofFileURL *string       `json:"proof_file_url"`
+	CreatedAt    time.Time     `json:"created_at"`
+	UpdatedAt    time.Time     `json:"updated_at"`
 }
 
 // DecimalAmount wraps decimal.Decimal to guarantee exact 2 decimal places JSON string serialization.

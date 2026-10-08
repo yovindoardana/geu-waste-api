@@ -205,4 +205,3 @@ func (s *PaymentService) ConfirmPaymentWithProof(
 
 	return confirmed, nil
 }
-

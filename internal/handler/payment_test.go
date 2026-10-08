@@ -79,4 +79,3 @@ func TestPaymentHandler_InvalidRequests(t *testing.T) {
 		}
 	})
 }
-

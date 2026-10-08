@@ -224,4 +224,3 @@ func (h *PaymentHandler) Confirm(c *gin.Context) {
 
 	response.JSON(c, http.StatusOK, "payment confirmed successfully", confirmed)
 }
-

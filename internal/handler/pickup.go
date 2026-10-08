@@ -221,4 +221,3 @@ func (h *PickupHandler) Complete(c *gin.Context) {
 
 	response.JSON(c, http.StatusOK, "pickup completed successfully", result)
 }
-

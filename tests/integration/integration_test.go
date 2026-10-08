@@ -771,4 +771,3 @@ func TestSafetyCheck_RefuseAppDatabase(t *testing.T) {
 		t.Errorf("expected valid test db name to pass safety check, got %v", err)
 	}
 }
-

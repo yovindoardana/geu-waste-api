@@ -33,4 +33,3 @@ func (s *ReportService) GetPaymentSummary(ctx context.Context) (*domain.PaymentS
 	}
 	return s.repo.GetPaymentSummary(ctx)
 }
-

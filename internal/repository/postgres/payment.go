@@ -491,4 +491,3 @@ func (r *PaymentRepository) ConfirmPayment(
 
 	return &confirmed, nil
 }
-
