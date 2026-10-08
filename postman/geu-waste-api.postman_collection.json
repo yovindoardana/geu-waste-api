@@ -392,7 +392,11 @@
               "path": ["api", "payments"],
               "query": [
                 { "key": "status", "value": "pending" },
-                { "key": "limit", "value": "10" }
+                { "key": "limit", "value": "10" },
+                { "key": "page", "value": "1", "disabled": true },
+                { "key": "household_id", "value": "{{household_id}}", "disabled": true },
+                { "key": "start_date", "value": "2026-01-01", "disabled": true },
+                { "key": "end_date", "value": "2026-12-31", "disabled": true }
               ]
             }
           },
